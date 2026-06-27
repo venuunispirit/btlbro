@@ -89,7 +89,7 @@ export default function ProjectsPage() {
 
   const FormField = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div>
-      <label className="text-sm font-medium text-gray-300 mb-2 block">{label}</label>
+      <label className="text-sm font-medium text-[var(--text-secondary)] mb-2 block">{label}</label>
       {children}
     </div>
   );
@@ -136,17 +136,17 @@ export default function ProjectsPage() {
 
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4" onClick={() => setShowCreateModal(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 pb-0">
-              <h2 className="text-lg font-semibold text-white">Create Project</h2>
-              <button type="button" onClick={() => setShowCreateModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Create Project</h2>
+              <button type="button" onClick={() => setShowCreateModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-4">
               <FormField label="Project Name">
                 <Input placeholder="Enter project name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
               </FormField>
               <FormField label="Brand">
-                <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={form.brandId} onChange={e => setForm({ ...form, brandId: e.target.value })} required>
+                <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={form.brandId} onChange={e => setForm({ ...form, brandId: e.target.value })} required>
                   <option value="">Select Brand</option>
                   {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
@@ -155,7 +155,7 @@ export default function ProjectsPage() {
                 <Input placeholder="Brief description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
               </FormField>
               <FormField label="Status">
-                <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
                   <option value="ACTIVE">Active</option>
                   <option value="ON_HOLD">On Hold</option>
                   <option value="COMPLETED">Completed</option>
@@ -178,17 +178,17 @@ export default function ProjectsPage() {
 
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4" onClick={() => setShowEditModal(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 pb-0">
-              <h2 className="text-lg font-semibold text-white">Edit Project</h2>
-              <button type="button" onClick={() => setShowEditModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Edit Project</h2>
+              <button type="button" onClick={() => setShowEditModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleEdit} className="p-6 space-y-4">
               <FormField label="Project Name">
                 <Input placeholder="Enter project name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
               </FormField>
               <FormField label="Brand">
-                <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={form.brandId} onChange={e => setForm({ ...form, brandId: e.target.value })} required>
+                <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={form.brandId} onChange={e => setForm({ ...form, brandId: e.target.value })} required>
                   <option value="">Select Brand</option>
                   {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
@@ -197,7 +197,7 @@ export default function ProjectsPage() {
                 <Input placeholder="Brief description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
               </FormField>
               <FormField label="Status">
-                <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
                   <option value="ACTIVE">Active</option>
                   <option value="ON_HOLD">On Hold</option>
                   <option value="COMPLETED">Completed</option>

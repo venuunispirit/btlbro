@@ -131,9 +131,9 @@ export default function VendorsPage() {
 
   const Modal = ({ title, onSubmit, children }: { title: string; onSubmit: (e: React.FormEvent) => void; children: React.ReactNode }) => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30 max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 pb-0">
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h2>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           {children}
@@ -144,7 +144,7 @@ export default function VendorsPage() {
 
   const FormField = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div>
-      <label className="text-sm font-medium text-gray-300 mb-2 block">{label}</label>
+      <label className="text-sm font-medium text-[var(--text-secondary)] mb-2 block">{label}</label>
       {children}
     </div>
   );
@@ -226,8 +226,8 @@ export default function VendorsPage() {
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium truncate">{service.name}</span>
                             <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
-                              <button type="button" onClick={() => openEditService(service, vendor.id)} className="h-5 w-5 rounded flex items-center justify-center text-gray-400 hover:text-white transition-all"><Edit className="h-3 w-3" /></button>
-                              <button type="button" onClick={() => handleDeleteService(service.id)} className="h-5 w-5 rounded flex items-center justify-center text-gray-400 hover:text-red-400 transition-all"><Trash2 className="h-3 w-3" /></button>
+                              <button type="button" onClick={() => openEditService(service, vendor.id)} className="h-5 w-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"><Edit className="h-3 w-3" /></button>
+                              <button type="button" onClick={() => handleDeleteService(service.id)} className="h-5 w-5 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-all"><Trash2 className="h-3 w-3" /></button>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
@@ -250,10 +250,10 @@ export default function VendorsPage() {
 
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4" onClick={() => setShowCreateModal(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 pb-0">
-              <h2 className="text-lg font-semibold text-white">Create Vendor</h2>
-              <button type="button" onClick={() => setShowCreateModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Create Vendor</h2>
+              <button type="button" onClick={() => setShowCreateModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-4">
               <FormField label="Vendor Name">
@@ -288,10 +288,10 @@ export default function VendorsPage() {
 
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4" onClick={() => setShowEditModal(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 pb-0">
-              <h2 className="text-lg font-semibold text-white">Edit Vendor</h2>
-              <button type="button" onClick={() => setShowEditModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Edit Vendor</h2>
+              <button type="button" onClick={() => setShowEditModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleEdit} className="p-6 space-y-4">
               <FormField label="Vendor Name">
@@ -326,10 +326,10 @@ export default function VendorsPage() {
 
       {showServiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4" onClick={() => setShowServiceModal(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 pb-0">
-              <h2 className="text-lg font-semibold text-white">Add Service</h2>
-              <button type="button" onClick={() => setShowServiceModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Add Service</h2>
+              <button type="button" onClick={() => setShowServiceModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleAddService} className="p-6 space-y-4">
               <FormField label="Service Name">
@@ -355,10 +355,10 @@ export default function VendorsPage() {
 
       {showEditServiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4" onClick={() => setShowEditServiceModal(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 pb-0">
-              <h2 className="text-lg font-semibold text-white">Edit Service</h2>
-              <button type="button" onClick={() => setShowEditServiceModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Edit Service</h2>
+              <button type="button" onClick={() => setShowEditServiceModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleEditService} className="p-6 space-y-4">
               <FormField label="Service Name">

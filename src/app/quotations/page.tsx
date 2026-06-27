@@ -24,7 +24,7 @@ interface Vendor { id: string; name: string; services: Service[]; }
 interface LineItem { vendorId: string; serviceId: string; description: string; quantity: number; unitPrice: number; }
 
 const statusColors: Record<string, string> = {
-  DRAFT: "bg-gray-500/20 text-gray-300",
+  DRAFT: "bg-gray-500/20 text-[var(--text-secondary)]",
   SENT: "bg-blue-500/20 text-blue-300",
   ACCEPTED: "bg-emerald-500/20 text-emerald-300",
   REJECTED: "bg-red-500/20 text-red-300",
@@ -137,7 +137,7 @@ export default function QuotationsPage() {
 
   const FormField = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div>
-      <label className="text-sm font-medium text-gray-300 mb-2 block">{label}</label>
+      <label className="text-sm font-medium text-[var(--text-secondary)] mb-2 block">{label}</label>
       {children}
     </div>
   );
@@ -172,7 +172,7 @@ export default function QuotationsPage() {
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{q.title}</p>
                     <p className="text-xs text-muted-foreground mb-1">{q.brand.name}</p>
-                    <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                    <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
                       <span className="text-sm font-semibold">{q.currency} {Number(q.totalAmount).toLocaleString()}</span>
                     </div>
                   </CardContent>
@@ -185,10 +185,10 @@ export default function QuotationsPage() {
 
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-md p-4 pt-8 overflow-y-auto" onClick={() => setShowCreateModal(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-2xl shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 pb-0">
-              <h2 className="text-lg font-semibold text-white">Create Quotation</h2>
-              <button type="button" onClick={() => setShowCreateModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Create Quotation</h2>
+              <button type="button" onClick={() => setShowCreateModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-5">
               <FormField label="Title">
@@ -197,13 +197,13 @@ export default function QuotationsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Brand">
-                  <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={brandId} onChange={e => { setBrandId(e.target.value); setProjectId(""); }}>
+                  <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={brandId} onChange={e => { setBrandId(e.target.value); setProjectId(""); }}>
                     <option value="">Select Brand</option>
                     {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </FormField>
                 <FormField label="Project">
-                  <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={projectId} onChange={e => setProjectId(e.target.value)} disabled={!brandId}>
+                  <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={projectId} onChange={e => setProjectId(e.target.value)} disabled={!brandId}>
                     <option value="">Select Project</option>
                     {filteredProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
@@ -212,27 +212,27 @@ export default function QuotationsPage() {
 
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium text-gray-300">Line Items</label>
+                  <label className="text-sm font-medium text-[var(--text-secondary)]">Line Items</label>
                   <Button type="button" size="sm" variant="outline" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Add Item</Button>
                 </div>
                 <div className="space-y-3">
                   {items.map((item, idx) => (
-                    <div key={idx} className="bg-white/5 rounded-xl p-4 space-y-3">
+                    <div key={idx} className="bg-[var(--bg-subtle)] rounded-xl p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-400">Item #{idx + 1}</span>
+                        <span className="text-xs font-medium text-[var(--text-muted)]">Item #{idx + 1}</span>
                         {items.length > 1 && (
-                          <button type="button" onClick={() => removeItem(idx)} className="h-6 w-6 rounded flex items-center justify-center text-gray-400 hover:text-red-400 transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={() => removeItem(idx)} className="h-6 w-6 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <FormField label="Vendor">
-                          <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={item.vendorId} onChange={e => updateItem(idx, "vendorId", e.target.value)}>
+                          <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={item.vendorId} onChange={e => updateItem(idx, "vendorId", e.target.value)}>
                             <option value="">Select Vendor</option>
                             {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                           </select>
                         </FormField>
                         <FormField label="Service">
-                          <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={item.serviceId} onChange={e => updateItem(idx, "serviceId", e.target.value)} disabled={!item.vendorId}>
+                          <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={item.serviceId} onChange={e => updateItem(idx, "serviceId", e.target.value)} disabled={!item.vendorId}>
                             <option value="">Select Service</option>
                             {vendorServices(item.vendorId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>
@@ -249,7 +249,7 @@ export default function QuotationsPage() {
                           <Input type="number" min={0} value={item.unitPrice} onChange={e => updateItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} required />
                         </FormField>
                         <FormField label="Total">
-                          <div className="flex h-10 w-full items-center rounded-lg border border-[#333] bg-[#1a1a1a] px-3 text-sm text-white">{(item.quantity * item.unitPrice).toLocaleString()}</div>
+                          <div className="flex h-10 w-full items-center rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)]">{(item.quantity * item.unitPrice).toLocaleString()}</div>
                         </FormField>
                       </div>
                     </div>
@@ -257,16 +257,16 @@ export default function QuotationsPage() {
                 </div>
               </div>
 
-              <div className="border-t border-white/10 pt-4 space-y-2">
-                <div className="flex justify-between text-sm"><span className="text-gray-400">Subtotal</span><span>₹ {subtotal.toLocaleString()}</span></div>
+              <div className="border-t border-[var(--border-subtle)] pt-4 space-y-2">
+                <div className="flex justify-between text-sm"><span className="text-[var(--text-muted)]">Subtotal</span><span>₹ {subtotal.toLocaleString()}</span></div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Tax</span>
+                  <span className="text-[var(--text-muted)]">Tax</span>
                   <div className="flex items-center gap-2">
-                    <input type="number" className="w-14 rounded border border-[#333] bg-[#1a1a1a] px-2 py-1 text-xs text-white text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E87A1E]" value={taxRate} onChange={e => setTaxRate(parseFloat(e.target.value) || 0)} /> %
+                    <input type="number" className="w-14 rounded border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)] text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E87A1E]" value={taxRate} onChange={e => setTaxRate(parseFloat(e.target.value) || 0)} /> %
                     <span>₹ {taxAmount.toLocaleString()}</span>
                   </div>
                 </div>
-                <div className="flex justify-between text-base font-semibold border-t border-white/10 pt-2"><span>Total</span><span>₹ {totalAmount.toLocaleString()}</span></div>
+                <div className="flex justify-between text-base font-semibold border-t border-[var(--border-subtle)] pt-2"><span>Total</span><span>₹ {totalAmount.toLocaleString()}</span></div>
               </div>
 
               <FormField label="Notes (optional)">
@@ -286,17 +286,17 @@ export default function QuotationsPage() {
 
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4" onClick={() => setShowEditModal(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 pb-0">
-              <h2 className="text-lg font-semibold text-white">Edit Quotation</h2>
-              <button type="button" onClick={() => setShowEditModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Edit Quotation</h2>
+              <button type="button" onClick={() => setShowEditModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={handleEdit} className="p-6 space-y-4">
               <FormField label="Title">
                 <Input placeholder="Quotation title" value={editTitle} onChange={e => setEditTitle(e.target.value)} required />
               </FormField>
               <FormField label="Status">
-                <select className="flex h-10 w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                <select className="flex h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A1E]" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
                   <option value="DRAFT">Draft</option>
                   <option value="SENT">Sent</option>
                   <option value="ACCEPTED">Accepted</option>

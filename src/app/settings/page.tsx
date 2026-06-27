@@ -115,10 +115,10 @@ export default function SettingsPage() {
 
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4" onClick={() => setShowModal(false)}>
-            <div className="bg-white/10 border border-white/10 backdrop-blur-xl rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
+            <div className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] backdrop-blur-xl rounded-2xl w-full max-w-lg shadow-2xl shadow-black/30" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between p-6 pb-0">
-                <h2 className="text-lg font-semibold text-white">Add Team Member</h2>
-                <button onClick={() => setShowModal(false)} className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Add Team Member</h2>
+                <button onClick={() => setShowModal(false)} className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"><X className="h-4 w-4" /></button>
               </div>
               <form onSubmit={handleCreate} className="p-6 space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
