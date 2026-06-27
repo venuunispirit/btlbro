@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Users, Settings, X } from "lucide-react";
+import { Plus, Trash2, Users, Settings, X, Database, ExternalLink, RefreshCw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
@@ -22,9 +22,11 @@ export default function SettingsPage() {
   const [showModal, setShowModal] = useState(false);
   const [userRole, setUserRole] = useState("");
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "MEMBER" });
+  const [googleConnected, setGoogleConnected] = useState(false);
 
   useEffect(() => { fetchMembers(); }, []);
   useEffect(() => { apiFetch("/api/auth/session").then(r => r.json()).then(d => setUserRole(d?.user?.role || "")); }, []);
+  useEffect(() => { apiFetch("/api/google/status").then(r => r.json()).then(d => setGoogleConnected(d.connected)).catch(() => {}); }, []);
 
   const fetchMembers = async () => {
     try { const res = await apiFetch("/api/users"); const data = await res.json(); if (Array.isArray(data)) setMembers(data); }
@@ -42,6 +44,16 @@ export default function SettingsPage() {
     if (!confirm("Remove this team member?")) return;
     await apiFetch(`/api/users?id=${userId}`, { method: "DELETE" });
     fetchMembers();
+  };
+
+  const connectGoogle = async () => {
+    try {
+      const res = await apiFetch("/api/auth/google");
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      console.error("Failed to get auth URL:", err);
+    }
   };
 
   const isAdmin = userRole === "ADMIN";
@@ -67,6 +79,28 @@ export default function SettingsPage() {
                   <div className="flex justify-between"><span className="text-muted-foreground">Database</span><span>PostgreSQL</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Deploy</span><span>Oracle Cloud</span></div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4" /> Google Drive</CardTitle></CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <div className={`h-3 w-3 rounded-full ${googleConnected ? "bg-emerald-500" : "bg-gray-500"}`} />
+                  <span>{googleConnected ? "Connected" : "Not connected"}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {googleConnected
+                    ? "Your Google account is linked. Browse files from the Data page."
+                    : "Connect to browse spreadsheets and presentations from your Drive."}
+                </p>
+                <Button size="sm" variant="outline" className="w-full" onClick={connectGoogle}>
+                  {googleConnected ? (
+                    <><RefreshCw className="mr-2 h-3 w-3" /> Reconnect</>
+                  ) : (
+                    <><ExternalLink className="mr-2 h-3 w-3" /> Connect</>
+                  )}
+                </Button>
               </CardContent>
             </Card>
           </div>

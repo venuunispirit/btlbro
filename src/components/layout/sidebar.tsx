@@ -14,6 +14,7 @@ import {
   LogOut,
   ClipboardList,
   Bell,
+  Database,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Vendors", href: "/vendors", icon: Users },
   { name: "Quotations", href: "/quotations", icon: FileText },
   { name: "Presentations", href: "/presentations", icon: Presentation },
+  { name: "Data", href: "/data", icon: Database },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
