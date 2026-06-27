@@ -13,6 +13,9 @@ import {
   Database,
   RefreshCw,
   Table,
+  Download,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -29,12 +32,20 @@ interface DriveFile {
   owner?: string;
 }
 
+interface SheetData {
+  headers: string[];
+  rows: string[][];
+}
+
 export default function DataPage() {
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
+  const [sheetData, setSheetData] = useState<SheetData | null>(null);
+  const [pullingData, setPullingData] = useState(false);
+  const [showDataView, setShowDataView] = useState(false);
 
   useEffect(() => {
     checkConnection();
@@ -71,6 +82,30 @@ export default function DataPage() {
     } catch (err) {
       console.error("Failed to get auth URL:", err);
     }
+  };
+
+  const pullSheetData = async (file: DriveFile) => {
+    if (!file.isSheet) return;
+    setPullingData(true);
+    try {
+      const res = await apiFetch("/api/google/read-sheet", {
+        method: "POST",
+        body: JSON.stringify({ spreadsheetId: file.id }),
+      });
+      const data = await res.json();
+      setSheetData(data);
+      setShowDataView(true);
+    } catch (err) {
+      console.error("Failed to pull sheet data:", err);
+    } finally {
+      setPullingData(false);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewFile(null);
+    setSheetData(null);
+    setShowDataView(false);
   };
 
   const formatDate = (d?: string) => {
@@ -164,7 +199,7 @@ export default function DataPage() {
       {previewFile && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setPreviewFile(null)}
+          onClick={closePreview}
         >
           <div
             className="bg-[var(--bg-primary)] border border-[var(--border)] rounded-2xl w-full max-w-5xl shadow-2xl shadow-black/30 max-h-[90vh] flex flex-col"
@@ -180,29 +215,75 @@ export default function DataPage() {
                 <h2 className="font-semibold truncate">{previewFile.name}</h2>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  asChild
-                >
+                {previewFile.isSheet && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => pullSheetData(previewFile)}
+                    disabled={pullingData}
+                  >
+                    {pullingData ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    ) : showDataView ? (
+                      <EyeOff className="h-3.5 w-3.5 mr-1" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5 mr-1" />
+                    )}
+                    {pullingData ? "Loading..." : showDataView ? "Preview" : "Pull Data"}
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" asChild>
                   <a href={previewFile.webViewLink} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open
                   </a>
                 </Button>
                 <button
-                  onClick={() => setPreviewFile(null)}
+                  onClick={closePreview}
                   className="h-8 w-8 rounded-full bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] transition-all"
                 >
                   <span className="text-lg leading-none">&times;</span>
                 </button>
               </div>
             </div>
-            <div className="flex-1 min-h-0">
-              <iframe
-                src={previewFile.embedUrl}
-                className="w-full h-[80vh] rounded-b-2xl"
-                allowFullScreen
-              />
+            <div className="flex-1 min-h-0 overflow-auto">
+              {showDataView && sheetData ? (
+                <div className="p-4">
+                  {sheetData.rows.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No data rows found</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr>
+                            {sheetData.headers.map((h, i) => (
+                              <th key={i} className="text-left px-3 py-2 font-semibold text-[var(--text-primary)] border-b border-[var(--border)] bg-[var(--bg-subtle)] whitespace-nowrap">
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sheetData.rows.map((row, ri) => (
+                            <tr key={ri} className="hover:bg-[var(--bg-subtle)]/50">
+                              {row.map((cell, ci) => (
+                                <td key={ci} className="px-3 py-2 border-b border-[var(--border-subtle)] text-[var(--text-primary)] whitespace-nowrap">
+                                  {cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <iframe
+                  src={previewFile.embedUrl}
+                  className="w-full h-[80vh] rounded-b-2xl"
+                  allowFullScreen
+                />
+              )}
             </div>
           </div>
         </div>

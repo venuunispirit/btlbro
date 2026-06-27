@@ -139,6 +139,24 @@ export async function createOrUpdateSlide(
   };
 }
 
+export async function readSheetData(userId: string, spreadsheetId: string, range?: string) {
+  const sheets = await getSheetsService(userId);
+  if (!sheets) return null;
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: range || "Sheet1",
+  });
+
+  const values = res.data.values || [];
+  if (values.length < 2) return { headers: values[0] || [], rows: [] };
+
+  return {
+    headers: values[0],
+    rows: values.slice(1),
+  };
+}
+
 export function getEmbedUrl(fileId: string, mimeType: string) {
   if (mimeType === "application/vnd.google-apps.spreadsheet") {
     return `https://docs.google.com/spreadsheets/d/${fileId}/preview`;
