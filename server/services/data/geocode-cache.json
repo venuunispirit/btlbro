@@ -1,0 +1,1500 @@
+{
+ "q:prestige kingfisher towers": {
+  "lat": 12.9725204,
+  "lng": 77.5968308,
+  "display_name": "Prestige Kingfisher Towers, Shanthala Nagar, Ashokanagar, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:embassy lake terraces": {
+  "lat": 13.0501112,
+  "lng": 77.5946417,
+  "display_name": "Embassy Lake Terraces, Byatarayanapura, Bengaluru North City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:prestige shantiniketan, whitefield, bengaluru, karnataka": {
+  "lat": 12.9892717,
+  "lng": 77.7266513,
+  "display_name": "Prestige Shantiniketan, Whitefield Road, Tigalarapalya, Hoodi, Bengaluru East City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, 560048, India"
+ },
+ "q:brigade gateway, rajajinagar, bengaluru, karnataka": {
+  "lat": 13.0126008,
+  "lng": 77.5551075,
+  "display_name": "Sheraton Grand Bangalore Hotel at Brigade Gateway, Dr. Rajkumar Road, Milk Colony, Subrahmanya Nagar, Subramanyanagara, Bengaluru West City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560055, India"
+ },
+ "q:snn clermont": {
+  "lat": 13.0417328,
+  "lng": 77.6092946,
+  "display_name": "SNN Clermont, Kempapura, Bengaluru North City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:prestige white meadows": {
+  "lat": 12.9753821,
+  "lng": 77.7527139,
+  "display_name": "Prestige White Meadows, S.M Krishna Ward, Bengaluru East City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, India"
+ },
+ "q:shapoorji pallonji parkwest, binnypete, bengaluru, karnataka": {
+  "lat": 12.9661214,
+  "lng": 77.5592657,
+  "display_name": "Shapoorji Pallonji Parkwest, Binnypete, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:adarsh palm retreat": {
+  "lat": 12.9198212,
+  "lng": 77.6916244,
+  "display_name": "Adarsh Palm Retreat, Devarabeesanahalli, Shivanasamudra Ward, Bengaluru East City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, India"
+ },
+ "q:windmills of your mind": {
+  "lat": 12.982529,
+  "lng": 77.7217679,
+  "display_name": "Windmills Craftworks, 331, 5B Road, Total Environment Windmills Of Your Mind, Sitaramapalya, Kaveri Nagara, Bengaluru East City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, 560066, India"
+ },
+ "q:prestige jindal city": {
+  "lat": 13.054147,
+  "lng": 77.4887249,
+  "display_name": "Prestige Jindal City, Anchepalya, Madhavara, Chikkabidarakallu, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:brigade exotica": {
+  "lat": 13.0440351,
+  "lng": 77.7449697,
+  "display_name": "Brigade Exotica, Bhandarpura, Bandapura, Bangalore East, Bengaluru Urban, Karnataka, India"
+ },
+ "q:sobha indraprastha": {
+  "lat": 12.9799199,
+  "lng": 77.5635383,
+  "display_name": "Sobha Indraprastha, Gopalpura, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:century ethos": {
+  "lat": 13.0622016,
+  "lng": 77.5950136,
+  "display_name": "Century Ethos, Byatarayanapura, Bengaluru North City Corporation, Bengaluru, Yelahanka taluku, Bengaluru Urban, Karnataka, India"
+ },
+ "q:purva tiara": {
+  "lat": 12.8957499,
+  "lng": 77.5791535,
+  "display_name": "Purva Tiara, RBI Layout, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, India"
+ },
+ "q:brigade eternia, yelahanka, bengaluru, karnataka": {
+  "lat": 13.0944211,
+  "lng": 77.5925585,
+  "display_name": "Brigade Eternia (u/c), Judicial Layout, Nyayanga Badavane, Bengaluru North City Corporation, Bengaluru, Yelahanka taluku, Bengaluru Urban, Karnataka, India"
+ },
+ "q:l&t raintree boulevard": {
+  "lat": 13.0692178,
+  "lng": 77.5898146,
+  "display_name": "L&T Raintree Boulevard, Byatarayanapura, Bengaluru North City Corporation, Bengaluru, Yelahanka taluku, Bengaluru Urban, Karnataka, India"
+ },
+ "q:karle zenith, hebbal": {
+  "lat": 13.0482487,
+  "lng": 77.6185279,
+  "display_name": "Hebbal Fire Station, Karle Zenith Residency Road, Karle Zenith, Kempapura, Bengaluru North City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, 560024, India"
+ },
+ "q:total environment pursuit of radical rhapsody, whitefield, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787152901
+ },
+ "q:total environment pursuit of radical rhapsody, whitefield, bengaluru": {
+  "failed": true,
+  "at": 1788787152966
+ },
+ "q:total environment pursuit of radical rhapsody, whitefield": {
+  "failed": true,
+  "at": 1788787154022
+ },
+ "q:total environment pursuit of radical rhapsody": {
+  "failed": true,
+  "at": 1788787155132
+ },
+ "q:total environment pursuit of radical rhapsody, bengaluru": {
+  "failed": true,
+  "at": 1788787156229
+ },
+ "q:total environment pursuit of radical rhapsody bengaluru": {
+  "failed": true,
+  "at": 1788787157348
+ },
+ "q:prestige white meadows, whitefield, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787158464
+ },
+ "q:prestige white meadows, whitefield, bengaluru": {
+  "failed": true,
+  "at": 1788787159576
+ },
+ "q:prestige white meadows, whitefield": {
+  "failed": true,
+  "at": 1788787160676
+ },
+ "q:sattva luxuria, malleshwaram, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787161780
+ },
+ "q:sattva luxuria, malleshwaram, bengaluru": {
+  "failed": true,
+  "at": 1788787162885
+ },
+ "q:sattva luxuria, malleshwaram": {
+  "failed": true,
+  "at": 1788787163991
+ },
+ "q:sattva luxuria": {
+  "failed": true,
+  "at": 1788787165091
+ },
+ "q:sattva luxuria, bengaluru": {
+  "failed": true,
+  "at": 1788787166188
+ },
+ "q:sattva luxuria bengaluru": {
+  "failed": true,
+  "at": 1788787167307
+ },
+ "q:adarsh palm retreat, bellandur, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787168416
+ },
+ "q:adarsh palm retreat, bellandur, bengaluru": {
+  "failed": true,
+  "at": 1788787169545
+ },
+ "q:adarsh palm retreat, bellandur": {
+  "failed": true,
+  "at": 1788787170658
+ },
+ "q:svasa homes, basavanagudi, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787171980
+ },
+ "q:svasa homes, basavanagudi, bengaluru": {
+  "failed": true,
+  "at": 1788787174343
+ },
+ "q:svasa homes, basavanagudi": {
+  "failed": true,
+  "at": 1788787174352
+ },
+ "q:svasa homes": {
+  "failed": true,
+  "at": 1788787175460
+ },
+ "q:svasa homes, bengaluru": {
+  "failed": true,
+  "at": 1788787176565
+ },
+ "q:svasa homes bengaluru": {
+  "failed": true,
+  "at": 1788787177762
+ },
+ "q:windmills of your mind, whitefield, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787178797
+ },
+ "q:windmills of your mind, whitefield, bengaluru": {
+  "failed": true,
+  "at": 1788787179886
+ },
+ "q:windmills of your mind, whitefield": {
+  "failed": true,
+  "at": 1788787181718
+ },
+ "q:prestige jindal city, tumkur road, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787182118
+ },
+ "q:prestige jindal city, tumkur road, bengaluru": {
+  "failed": true,
+  "at": 1788787183233
+ },
+ "q:prestige jindal city, tumkur road": {
+  "failed": true,
+  "at": 1788787184337
+ },
+ "q:brigade exotica, old madras road, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787185451
+ },
+ "q:brigade exotica, old madras road, bengaluru": {
+  "failed": true,
+  "at": 1788787186555
+ },
+ "q:brigade exotica, old madras road": {
+  "failed": true,
+  "at": 1788787187673
+ },
+ "q:sobha indraprastha, rajajinagar, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787188773
+ },
+ "q:sobha indraprastha, rajajinagar, bengaluru": {
+  "failed": true,
+  "at": 1788787189875
+ },
+ "q:sobha indraprastha, rajajinagar": {
+  "failed": true,
+  "at": 1788787190978
+ },
+ "q:century ethos, hebbal, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787192081
+ },
+ "q:century ethos, hebbal, bengaluru": {
+  "failed": true,
+  "at": 1788787193198
+ },
+ "q:century ethos, hebbal": {
+  "failed": true,
+  "at": 1788787194320
+ },
+ "q:sattva magnificia, old madras road, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787195431
+ },
+ "q:sattva magnificia, old madras road, bengaluru": {
+  "failed": true,
+  "at": 1788787196535
+ },
+ "q:sattva magnificia, old madras road": {
+  "failed": true,
+  "at": 1788787198099
+ },
+ "q:sattva magnificia": {
+  "failed": true,
+  "at": 1788787198754
+ },
+ "q:sattva magnificia, bengaluru": {
+  "failed": true,
+  "at": 1788787199866
+ },
+ "q:sattva magnificia bengaluru": {
+  "failed": true,
+  "at": 1788787200968
+ },
+ "q:purva tiara, jp nagar, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787202075
+ },
+ "q:purva tiara, jp nagar, bengaluru": {
+  "failed": true,
+  "at": 1788787204580
+ },
+ "q:purva tiara, jp nagar": {
+  "failed": true,
+  "at": 1788787204430
+ },
+ "q:concorde antares, vidyaranyapura, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787205707
+ },
+ "q:concorde antares, vidyaranyapura, bengaluru": {
+  "failed": true,
+  "at": 1788787206698
+ },
+ "q:concorde antares, vidyaranyapura": {
+  "failed": true,
+  "at": 1788787207835
+ },
+ "q:concorde antares": {
+  "failed": true,
+  "at": 1788787208911
+ },
+ "q:concorde antares, bengaluru": {
+  "failed": true,
+  "at": 1788787210492
+ },
+ "q:concorde antares bengaluru": {
+  "failed": true,
+  "at": 1788787211171
+ },
+ "q:l&t raintree boulevard, hebbal, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787212697
+ },
+ "q:l&t raintree boulevard, hebbal, bengaluru": {
+  "failed": true,
+  "at": 1788787213766
+ },
+ "q:l&t raintree boulevard, hebbal": {
+  "failed": true,
+  "at": 1788787214898
+ },
+ "q:karle zenith, hebbal, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787216032
+ },
+ "q:karle zenith, hebbal, bengaluru": {
+  "failed": true,
+  "at": 1788787216867
+ },
+ "q:tata new haven, dasanapura, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787218376
+ },
+ "q:tata new haven, dasanapura, bengaluru": {
+  "failed": true,
+  "at": 1788787219446
+ },
+ "q:tata new haven, dasanapura": {
+  "lat": 13.078069,
+  "lng": 77.4460846,
+  "display_name": "Depot-40 Dasanapura BMTC Bus Garage, Huskur Road, Tata Value Housing New Haven, Vaderahalli, Heggadadevanapura, Bangalore North, Bengaluru Urban, Karnataka, 562162, India"
+ },
+ "q:mahaveer sitara, jp nagar, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787222174
+ },
+ "q:mahaveer sitara, jp nagar, bengaluru": {
+  "failed": true,
+  "at": 1788787223000
+ },
+ "q:mahaveer sitara, jp nagar": {
+  "failed": true,
+  "at": 1788787224727
+ },
+ "q:mahaveer sitara": {
+  "lat": 12.8937793,
+  "lng": 77.5875954,
+  "display_name": "Mahaveer Sitara Apartments, Puttenahalli, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, India"
+ },
+ "q:dsr elite, mahadevapura, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787226963
+ },
+ "q:dsr elite, mahadevapura, bengaluru": {
+  "failed": true,
+  "at": 1788787228472
+ },
+ "q:dsr elite, mahadevapura": {
+  "failed": true,
+  "at": 1788787229241
+ },
+ "q:dsr elite": {
+  "lat": 12.9931165,
+  "lng": 77.6894097,
+  "display_name": "DSR Elite, Garudachar Palya, Bengaluru East City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, India"
+ },
+ "q:pebble bay apartments, dollars colony, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787231792
+ },
+ "q:pebble bay apartments, dollars colony, bengaluru": {
+  "failed": true,
+  "at": 1788787233233
+ },
+ "q:pebble bay apartments, dollars colony": {
+  "failed": true,
+  "at": 1788787234255
+ },
+ "q:pebble bay apartments": {
+  "lat": 13.0448644,
+  "lng": 77.572164,
+  "display_name": "Pebble Bay Apartments, Nagashettyhalli, Bengaluru North City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:golden grand, yeshwanthpur, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787236174
+ },
+ "q:golden grand, yeshwanthpur, bengaluru": {
+  "failed": true,
+  "at": 1788787237175
+ },
+ "q:golden grand, yeshwanthpur": {
+  "failed": true,
+  "at": 1788787238263
+ },
+ "q:golden grand": {
+  "lat": 13.0276222,
+  "lng": 77.5466087,
+  "display_name": "Golden Grand, Goraguntepalya, Bengaluru West City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:renaissance reserva, jalahalli, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787240572
+ },
+ "q:renaissance reserva, jalahalli, bengaluru": {
+  "failed": true,
+  "at": 1788787241933
+ },
+ "q:renaissance reserva, jalahalli": {
+  "failed": true,
+  "at": 1788787243058
+ },
+ "q:renaissance reserva": {
+  "lat": 13.041603,
+  "lng": 77.547964,
+  "display_name": "Renaissance Reserva, Gokula, HMT Ward, Bengaluru North City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India"
+ },
+ "q:provident sunworth, mysore road, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788787245118
+ },
+ "q:provident sunworth, mysore road, bengaluru": {
+  "failed": true,
+  "at": 1788787246114
+ },
+ "q:provident sunworth, mysore road": {
+  "failed": true,
+  "at": 1788787247429
+ },
+ "q:provident sunworth": {
+  "lat": 12.8812765,
+  "lng": 77.4703169,
+  "display_name": "Provident Sunworth, Venkatapura, Doddabele, Bangalore South, Bengaluru Urban, Karnataka, India"
+ },
+ "q:dyu art cafe koramangala bangalore": {
+  "lat": 12.9371896,
+  "lng": 77.6176798,
+  "display_name": "Dyu Art Cafe, Shop No. 1, No. 23 MIG, 1st B Main Road, Koramangala 8th Block, Adugodi, A Adugodi, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560030, India"
+ },
+ "q:the hole in the wall cafe koramangala bangalore": {
+  "lat": 12.9347615,
+  "lng": 77.6254885,
+  "display_name": "The Hole In The Wall Cafe, 3, 8th Main Road, Jakkasandra Block, Kormangala East, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560034, India"
+ },
+ "q:paper pie 100 feet rd indiranagar bangalore": {
+  "lat": 12.9809732,
+  "lng": 77.6410038,
+  "display_name": "Paper & Pie, 842A, 100 Feet Road, Old Binnamangala, Indiranagar, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560038, India"
+ },
+ "q:trippy goat cafe mg road bangalore": {
+  "lat": 12.973166,
+  "lng": 77.6143428,
+  "display_name": "Trippy Goat, Mahatma Gandhi Road, Craig Park Layout, Ashok Nagar, Ashokanagar, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560025, India"
+ },
+ "q:the bangalore cafe shanti nagar bangalore": {
+  "failed": true,
+  "at": 1788787254356
+ },
+ "q:cafe azzure mg road bangalore": {
+  "lat": 12.97501,
+  "lng": 77.6074728,
+  "display_name": "Cafe Azzure, Mahatma Gandhi Road, Ashok Nagar, Ashokanagar, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560001, India"
+ },
+ "q:araku coffee indiranagar bangalore": {
+  "lat": 12.9699145,
+  "lng": 77.639208,
+  "display_name": "Araku Coffee, 12th Main Road, Motappanapalya, Indiranagar, Jogpalya, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560008, India"
+ },
+ "q:matteo coffea church street bangalore": {
+  "failed": true,
+  "at": 1788787258316
+ },
+ "q:glens bakehouse indiranagar bangalore": {
+  "failed": true,
+  "at": 1788787259234
+ },
+ "q:the kind roastery and brew room indiranagar bangalore": {
+  "failed": true,
+  "at": 1788787260328
+ },
+ "q:lazy suzy indiranagar bangalore": {
+  "lat": 12.9708508,
+  "lng": 77.6474894,
+  "display_name": "Lazy Suzy, 80 Feet Road, HAL 2nd Stage, Kodihalli, Indiranagar, Bengaluru Central City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, 560075, India"
+ },
+ "q:champaca bookstore cafe bangalore": {
+  "lat": 12.9873463,
+  "lng": 77.5959886,
+  "display_name": "Champaca Bookstore, Library & Cafe, 7/1, Edward Road, Kaverappa Layout, Vasanth Nagar, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560052, India"
+ },
+ "q:cafe noir ub city bangalore": {
+  "failed": true,
+  "at": 1788787263877
+ },
+ "q:third wave coffee koramangala bangalore": {
+  "lat": 12.9347397,
+  "lng": 77.6296212,
+  "display_name": "Third Wave Coffee Roasters, 1st A Cross, Green Leaf Layout, Kormangala East, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560095, India"
+ },
+ "q:the white room coffee kitchen church street bangalore": {
+  "lat": 12.9751544,
+  "lng": 77.6031683,
+  "display_name": "The White Room Coffee & Kitchen, Church Street, Ashok Nagar, Ashokanagar, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560001, India"
+ },
+ "q:whitefield (kadugodi) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787266774
+ },
+ "q:whitefield (kadugodi) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787268044
+ },
+ "q:whitefield (kadugodi) metro station": {
+  "failed": true,
+  "at": 1788787269445
+ },
+ "q:whitefield (kadugodi) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787269914
+ },
+ "q:whitefield (kadugodi) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787271320
+ },
+ "q:hopefarm channasandra metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787272447
+ },
+ "q:hopefarm channasandra metro station, bangalore": {
+  "failed": true,
+  "at": 1788787273496
+ },
+ "q:hopefarm channasandra metro station": {
+  "failed": true,
+  "at": 1788787275065
+ },
+ "q:hopefarm channasandra metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787275784
+ },
+ "q:hopefarm channasandra metro station bengaluru": {
+  "failed": true,
+  "at": 1788787277251
+ },
+ "q:sri sathya sai hospital metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787279561
+ },
+ "q:sri sathya sai hospital metro station, bangalore": {
+  "failed": true,
+  "at": 1788787280433
+ },
+ "q:sri sathya sai hospital metro station": {
+  "failed": true,
+  "at": 1788787281406
+ },
+ "q:sri sathya sai hospital metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787282559
+ },
+ "q:sri sathya sai hospital metro station bengaluru": {
+  "failed": true,
+  "at": 1788787283502
+ },
+ "q:kundalahalli metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787285044
+ },
+ "q:kundalahalli metro station, bangalore": {
+  "failed": true,
+  "at": 1788787286066
+ },
+ "q:kundalahalli metro station": {
+  "failed": true,
+  "at": 1788787287212
+ },
+ "q:kundalahalli metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787288143
+ },
+ "q:kundalahalli metro station bengaluru": {
+  "failed": true,
+  "at": 1788787289447
+ },
+ "q:singayyanapalya metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787290074
+ },
+ "q:singayyanapalya metro station, bangalore": {
+  "failed": true,
+  "at": 1788787290951
+ },
+ "q:singayyanapalya metro station": {
+  "failed": true,
+  "at": 1788787292361
+ },
+ "q:singayyanapalya metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787293446
+ },
+ "q:singayyanapalya metro station bengaluru": {
+  "failed": true,
+  "at": 1788787294667
+ },
+ "q:krishnarajapura (kr puram) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787295690
+ },
+ "q:krishnarajapura (kr puram) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787296809
+ },
+ "q:krishnarajapura (kr puram) metro station": {
+  "failed": true,
+  "at": 1788787298251
+ },
+ "q:krishnarajapura (kr puram) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787299005
+ },
+ "q:krishnarajapura (kr puram) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787300195
+ },
+ "q:benniganahalli metro station, bangalore, karnataka": {
+  "lat": 12.9964275,
+  "lng": 77.668316,
+  "display_name": "Benniganahalli Metro Station, Swamy Vivekananda Road, Pai Layout, K.S. Nissar Ahmed Ward, Bengaluru East City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, 560016, India"
+ },
+ "q:baiyappanahalli metro station, bangalore, karnataka": {
+  "lat": 12.9919374,
+  "lng": 77.6515996,
+  "display_name": "Baiyappanahalli Metro Station Back Gate, Railway Line Road, Baiyyappanahalli, Krishnaiahnapalya, Bengaluru Central City Corporation, Bengaluru, Bangalore East, Bengaluru Urban, Karnataka, 560033, India"
+ },
+ "q:swami vivekananda road metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787303265
+ },
+ "q:swami vivekananda road metro station, bangalore": {
+  "failed": true,
+  "at": 1788787304680
+ },
+ "q:swami vivekananda road metro station": {
+  "failed": true,
+  "at": 1788787305984
+ },
+ "q:swami vivekananda road metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787306785
+ },
+ "q:swami vivekananda road metro station bengaluru": {
+  "failed": true,
+  "at": 1788787308361
+ },
+ "q:indiranagar metro station, bangalore, karnataka": {
+  "lat": 12.9782941,
+  "lng": 77.6386519,
+  "display_name": "Indiranagar Metro Station, Chinmaya Mission Hospital Road, Indiranagar 1st Stage, Hoysala Nagara Central, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560038, India"
+ },
+ "q:halasuru metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787310378
+ },
+ "q:halasuru metro station, bangalore": {
+  "failed": true,
+  "at": 1788787311219
+ },
+ "q:halasuru metro station": {
+  "failed": true,
+  "at": 1788787312749
+ },
+ "q:halasuru metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787313407
+ },
+ "q:halasuru metro station bengaluru": {
+  "failed": true,
+  "at": 1788787314318
+ },
+ "q:trinity metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787316279
+ },
+ "q:trinity metro station, bangalore": {
+  "failed": true,
+  "at": 1788787317213
+ },
+ "q:trinity metro station": {
+  "failed": true,
+  "at": 1788787318769
+ },
+ "q:trinity metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787319782
+ },
+ "q:trinity metro station bengaluru": {
+  "failed": true,
+  "at": 1788787320572
+ },
+ "q:mahatma gandhi road (mg road) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787321625
+ },
+ "q:mahatma gandhi road (mg road) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787323021
+ },
+ "q:mahatma gandhi road (mg road) metro station": {
+  "lat": 12.9753877,
+  "lng": 77.6064952,
+  "display_name": "MG Road Metro Station, Mahatma Gandhi Road, Ashok Nagar, Ashokanagar, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560001, India"
+ },
+ "q:cubbon park metro station, bangalore, karnataka": {
+  "lat": 12.9807412,
+  "lng": 77.5984117,
+  "display_name": "Cubbon Park Metro Station, Cunningham Road, Shivajinagar, Bengaluru Central City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560001, India"
+ },
+ "q:dr. b.r. ambedkar station (vidhana soudha) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787327537
+ },
+ "q:dr. b.r. ambedkar station (vidhana soudha) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787328444
+ },
+ "q:dr. b.r. ambedkar station (vidhana soudha) metro station": {
+  "failed": true,
+  "at": 1788787329481
+ },
+ "q:dr. b.r. ambedkar station (vidhana soudha) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787330404
+ },
+ "q:dr. b.r. ambedkar station (vidhana soudha) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787331943
+ },
+ "q:sir m. visvesvaraya station (central college) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787332918
+ },
+ "q:sir m. visvesvaraya station (central college) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787333588
+ },
+ "q:sir m. visvesvaraya station (central college) metro station": {
+  "failed": true,
+  "at": 1788787335013
+ },
+ "q:sir m. visvesvaraya station (central college) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787336549
+ },
+ "q:sir m. visvesvaraya station (central college) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787337166
+ },
+ "q:nadaprabhu kempegowda station (majestic) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787338804
+ },
+ "q:nadaprabhu kempegowda station (majestic) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787339601
+ },
+ "q:nadaprabhu kempegowda station (majestic) metro station": {
+  "failed": true,
+  "at": 1788787340991
+ },
+ "q:nadaprabhu kempegowda station (majestic) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787341587
+ },
+ "q:nadaprabhu kempegowda station (majestic) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787343510
+ },
+ "q:city railway station metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787344502
+ },
+ "q:city railway station metro station, bangalore": {
+  "failed": true,
+  "at": 1788787346175
+ },
+ "q:city railway station metro station": {
+  "lat": 28.6674493,
+  "lng": 77.2282488,
+  "display_name": "Kashmere Gate, Kashmere Gate Metro Station, Lothiyan Road, Kashmere Gate, Sadar Bazar, Old Delhi, City & Sadar, Delhi, Old Delhi, Delhi, 110006, India"
+ },
+ "q:magadi road metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787347973
+ },
+ "q:magadi road metro station, bangalore": {
+  "failed": true,
+  "at": 1788787349042
+ },
+ "q:magadi road metro station": {
+  "failed": true,
+  "at": 1788787350172
+ },
+ "q:magadi road metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787351033
+ },
+ "q:magadi road metro station bengaluru": {
+  "failed": true,
+  "at": 1788787352529
+ },
+ "q:hosahalli metro station, bangalore, karnataka": {
+  "lat": 12.9740795,
+  "lng": 77.5443065,
+  "display_name": "Manuvana/Hosahalli Metro station, Chord Road, Adi Chunchanagiri Ward, Bengaluru West City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560040, India"
+ },
+ "q:vijayanagar metro station, bangalore, karnataka": {
+  "lat": 12.9700505,
+  "lng": 77.5367565,
+  "display_name": "Aadishwar, Chord Road, M C Layout, Dr. Vishnuvardhan Ward, Bengaluru West City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560040, India"
+ },
+ "q:attiguppe metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787355664
+ },
+ "q:attiguppe metro station, bangalore": {
+  "failed": true,
+  "at": 1788787356685
+ },
+ "q:attiguppe metro station": {
+  "failed": true,
+  "at": 1788787357678
+ },
+ "q:attiguppe metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787359014
+ },
+ "q:attiguppe metro station bengaluru": {
+  "failed": true,
+  "at": 1788787361178
+ },
+ "q:deepanjali nagar metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787361500
+ },
+ "q:deepanjali nagar metro station, bangalore": {
+  "failed": true,
+  "at": 1788787363162
+ },
+ "q:deepanjali nagar metro station": {
+  "failed": true,
+  "at": 1788787363778
+ },
+ "q:deepanjali nagar metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787365221
+ },
+ "q:deepanjali nagar metro station bengaluru": {
+  "failed": true,
+  "at": 1788787366449
+ },
+ "q:mysore road metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787367680
+ },
+ "q:mysore road metro station, bangalore": {
+  "failed": true,
+  "at": 1788787368109
+ },
+ "q:mysore road metro station": {
+  "lat": 12.9078841,
+  "lng": 77.4764561,
+  "display_name": "Kengeri Metro Station, Mysore Road, Hemmigepura, Bengaluru West City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560060, India"
+ },
+ "q:pantharapalya - nayandahalli metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787371247
+ },
+ "q:pantharapalya - nayandahalli metro station, bangalore": {
+  "failed": true,
+  "at": 1788787372267
+ },
+ "q:pantharapalya - nayandahalli metro station": {
+  "failed": true,
+  "at": 1788787375572
+ },
+ "q:pantharapalya - nayandahalli metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787376446
+ },
+ "q:pantharapalya - nayandahalli metro station bengaluru": {
+  "failed": true,
+  "at": 1788787377497
+ },
+ "q:rajarajeshwari nagar metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787378614
+ },
+ "q:rajarajeshwari nagar metro station, bangalore": {
+  "failed": true,
+  "at": 1788787380691
+ },
+ "q:rajarajeshwari nagar metro station": {
+  "lat": 12.9360241,
+  "lng": 77.5188109,
+  "display_name": "Rajarajeshwari Nagar Metro Station Parking, Kenchenahalli Main Road, Bangarappa Nagara, Bengaluru West City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560039, India"
+ },
+ "q:jnanabharathi metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787382941
+ },
+ "q:jnanabharathi metro station, bangalore": {
+  "failed": true,
+  "at": 1788787384113
+ },
+ "q:jnanabharathi metro station": {
+  "failed": true,
+  "at": 1788787385405
+ },
+ "q:jnanabharathi metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787386265
+ },
+ "q:jnanabharathi metro station bengaluru": {
+  "failed": true,
+  "at": 1788787387381
+ },
+ "q:pattanagere metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787388476
+ },
+ "q:pattanagere metro station, bangalore": {
+  "failed": true,
+  "at": 1788787390112
+ },
+ "q:pattanagere metro station": {
+  "failed": true,
+  "at": 1788787391209
+ },
+ "q:pattanagere metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787392379
+ },
+ "q:pattanagere metro station bengaluru": {
+  "failed": true,
+  "at": 1788787393868
+ },
+ "q:kengeri metro station, bangalore, karnataka": {
+  "lat": 12.9078841,
+  "lng": 77.4764561,
+  "display_name": "Kengeri Metro Station, Mysore Road, Hemmigepura, Bengaluru West City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560060, India"
+ },
+ "q:challaghatta metro station, bangalore, karnataka": {
+  "lat": 12.8974273,
+  "lng": 77.4613082,
+  "display_name": "Challaghatta Metro Station, Bengaluru-Mysuru Expressway, Hemmigepura, Kambipura, Doddabele, Bangalore South, Bengaluru Urban, Karnataka, 560060, India"
+ },
+ "q:madavara (biec) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787396473
+ },
+ "q:madavara (biec) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787398289
+ },
+ "q:madavara (biec) metro station": {
+  "failed": true,
+  "at": 1788787398712
+ },
+ "q:madavara (biec) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787400520
+ },
+ "q:madavara (biec) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787401266
+ },
+ "q:chikkabanavara metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787402355
+ },
+ "q:chikkabanavara metro station, bangalore": {
+  "failed": true,
+  "at": 1788787403527
+ },
+ "q:chikkabanavara metro station": {
+  "failed": true,
+  "at": 1788787404641
+ },
+ "q:chikkabanavara metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787405659
+ },
+ "q:chikkabanavara metro station bengaluru": {
+  "failed": true,
+  "at": 1788787406490
+ },
+ "q:nagasandra metro station, bangalore, karnataka": {
+  "lat": 13.0480429,
+  "lng": 77.5005121,
+  "display_name": "Nagasandra Metro Station Parking, Goraguntepalya Flyover, Peenya Industrial Area, Chokkasandra, Bengaluru North City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560057, India"
+ },
+ "q:dasarahalli metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787409561
+ },
+ "q:dasarahalli metro station, bangalore": {
+  "failed": true,
+  "at": 1788787409897
+ },
+ "q:dasarahalli metro station": {
+  "failed": true,
+  "at": 1788787411647
+ },
+ "q:dasarahalli metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787412528
+ },
+ "q:dasarahalli metro station bengaluru": {
+  "failed": true,
+  "at": 1788787413893
+ },
+ "q:jalahalli metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787414747
+ },
+ "q:jalahalli metro station, bangalore": {
+  "failed": true,
+  "at": 1788787415902
+ },
+ "q:jalahalli metro station": {
+  "failed": true,
+  "at": 1788787416472
+ },
+ "q:jalahalli metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787418310
+ },
+ "q:jalahalli metro station bengaluru": {
+  "failed": true,
+  "at": 1788787418725
+ },
+ "q:peenya industry metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787420121
+ },
+ "q:peenya industry metro station, bangalore": {
+  "failed": true,
+  "at": 1788787420927
+ },
+ "q:peenya industry metro station": {
+  "failed": true,
+  "at": 1788787422718
+ },
+ "q:peenya industry metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787423496
+ },
+ "q:peenya industry metro station bengaluru": {
+  "failed": true,
+  "at": 1788787424599
+ },
+ "q:peenya metro station, bangalore, karnataka": {
+  "lat": 13.0358031,
+  "lng": 77.5255837,
+  "display_name": "Peenya Metro Station, Tumkur Road, Peenya Industrial Area, Goragunte Palya, Peenya, Bengaluru West City Corporation, Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, 560058, India"
+ },
+ "q:goraguntepalya metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787426721
+ },
+ "q:goraguntepalya metro station, bangalore": {
+  "failed": true,
+  "at": 1788787427614
+ },
+ "q:goraguntepalya metro station": {
+  "failed": true,
+  "at": 1788787429034
+ },
+ "q:goraguntepalya metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787430008
+ },
+ "q:goraguntepalya metro station bengaluru": {
+  "failed": true,
+  "at": 1788787430902
+ },
+ "q:yeshwanthpur metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787432396
+ },
+ "q:yeshwanthpur metro station, bangalore": {
+  "failed": true,
+  "at": 1788787433563
+ },
+ "q:yeshwanthpur metro station": {
+  "failed": true,
+  "at": 1788787434546
+ },
+ "q:yeshwanthpur metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787435990
+ },
+ "q:yeshwanthpur metro station bengaluru": {
+  "failed": true,
+  "at": 1788787437113
+ },
+ "q:sandal soap factory metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787437533
+ },
+ "q:sandal soap factory metro station, bangalore": {
+  "failed": true,
+  "at": 1788787439008
+ },
+ "q:sandal soap factory metro station": {
+  "failed": true,
+  "at": 1788787439827
+ },
+ "q:sandal soap factory metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787441142
+ },
+ "q:sandal soap factory metro station bengaluru": {
+  "failed": true,
+  "at": 1788787442635
+ },
+ "q:mahalakshmi metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787443768
+ },
+ "q:mahalakshmi metro station, bangalore": {
+  "failed": true,
+  "at": 1788787444790
+ },
+ "q:mahalakshmi metro station": {
+  "failed": true,
+  "at": 1788787445324
+ },
+ "q:mahalakshmi metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787446669
+ },
+ "q:mahalakshmi metro station bengaluru": {
+  "failed": true,
+  "at": 1788787447962
+ },
+ "q:rajajinagar metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787449345
+ },
+ "q:rajajinagar metro station, bangalore": {
+  "failed": true,
+  "at": 1788787450598
+ },
+ "q:rajajinagar metro station": {
+  "failed": true,
+  "at": 1788787450889
+ },
+ "q:rajajinagar metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787451985
+ },
+ "q:rajajinagar metro station bengaluru": {
+  "failed": true,
+  "at": 1788787453650
+ },
+ "q:kuempu road metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787455043
+ },
+ "q:kuempu road metro station, bangalore": {
+  "failed": true,
+  "at": 1788787455666
+ },
+ "q:kuempu road metro station": {
+  "failed": true,
+  "at": 1788787457134
+ },
+ "q:kuempu road metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787458056
+ },
+ "q:kuempu road metro station bengaluru": {
+  "failed": true,
+  "at": 1788787458817
+ },
+ "q:srirampura metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787460909
+ },
+ "q:srirampura metro station, bangalore": {
+  "failed": true,
+  "at": 1788787461144
+ },
+ "q:srirampura metro station": {
+  "failed": true,
+  "at": 1788787462607
+ },
+ "q:srirampura metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787463836
+ },
+ "q:srirampura metro station bengaluru": {
+  "failed": true,
+  "at": 1788787464532
+ },
+ "q:mantri square sampige road metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787465910
+ },
+ "q:mantri square sampige road metro station, bangalore": {
+  "failed": true,
+  "at": 1788787467046
+ },
+ "q:mantri square sampige road metro station": {
+  "failed": true,
+  "at": 1788787469057
+ },
+ "q:mantri square sampige road metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787469589
+ },
+ "q:mantri square sampige road metro station bengaluru": {
+  "failed": true,
+  "at": 1788787471106
+ },
+ "q:chikkapete metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787472374
+ },
+ "q:chikkapete metro station, bangalore": {
+  "failed": true,
+  "at": 1788787473085
+ },
+ "q:chikkapete metro station": {
+  "failed": true,
+  "at": 1788787474212
+ },
+ "q:chikkapete metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787475309
+ },
+ "q:chikkapete metro station bengaluru": {
+  "failed": true,
+  "at": 1788787476824
+ },
+ "q:krishna rajendra market (kr market) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787478067
+ },
+ "q:krishna rajendra market (kr market) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787478886
+ },
+ "q:krishna rajendra market (kr market) metro station": {
+  "failed": true,
+  "at": 1788787480131
+ },
+ "q:krishna rajendra market (kr market) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787481132
+ },
+ "q:krishna rajendra market (kr market) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787482416
+ },
+ "q:national college metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787483215
+ },
+ "q:national college metro station, bangalore": {
+  "failed": true,
+  "at": 1788787484824
+ },
+ "q:national college metro station": {
+  "lat": 28.6718164,
+  "lng": 77.2776882,
+  "display_name": "Welcome Metro Station (Red Line), Welcome Metro Station, GT Road, Kanti Nagar Extension, Shahdara South, Delhi, East Delhi, Delhi, 110032, India"
+ },
+ "q:lalbagh metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787486145
+ },
+ "q:lalbagh metro station, bangalore": {
+  "failed": true,
+  "at": 1788787487554
+ },
+ "q:lalbagh metro station": {
+  "failed": true,
+  "at": 1788787488560
+ },
+ "q:lalbagh metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787491566
+ },
+ "q:lalbagh metro station bengaluru": {
+  "failed": true,
+  "at": 1788787492956
+ },
+ "q:south end circle metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787494757
+ },
+ "q:south end circle metro station, bangalore": {
+  "failed": true,
+  "at": 1788787496192
+ },
+ "q:south end circle metro station": {
+  "failed": true,
+  "at": 1788787498206
+ },
+ "q:south end circle metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787499058
+ },
+ "q:south end circle metro station bengaluru": {
+  "failed": true,
+  "at": 1788787499645
+ },
+ "q:jayanagar metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787803529
+ },
+ "q:jayanagar metro station, bangalore": {
+  "failed": true,
+  "at": 1788787804311
+ },
+ "q:jayanagar metro station": {
+  "lat": 12.9287715,
+  "lng": 77.580345,
+  "display_name": "Jayanagara Metro Station, 30th Cross Road, Geetha Colony, Jayanagar 4th Block, Byrasandra, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560011, India"
+ },
+ "q:rashtreeya vidyalaya road (rv road) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787806581
+ },
+ "q:rashtreeya vidyalaya road (rv road) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787807658
+ },
+ "q:rashtreeya vidyalaya road (rv road) metro station": {
+  "failed": true,
+  "at": 1788787808956
+ },
+ "q:rashtreeya vidyalaya road (rv road) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787810157
+ },
+ "q:rashtreeya vidyalaya road (rv road) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787811323
+ },
+ "q:banashankari metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787811710
+ },
+ "q:banashankari metro station, bangalore": {
+  "failed": true,
+  "at": 1788787813270
+ },
+ "q:banashankari metro station": {
+  "failed": true,
+  "at": 1788787814373
+ },
+ "q:banashankari metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787815039
+ },
+ "q:banashankari metro station bengaluru": {
+  "failed": true,
+  "at": 1788787816812
+ },
+ "q:jaya prakash nagar (jp nagar) metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787817355
+ },
+ "q:jaya prakash nagar (jp nagar) metro station, bangalore": {
+  "failed": true,
+  "at": 1788787818965
+ },
+ "q:jaya prakash nagar (jp nagar) metro station": {
+  "failed": true,
+  "at": 1788787820029
+ },
+ "q:jaya prakash nagar (jp nagar) metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787820642
+ },
+ "q:jaya prakash nagar (jp nagar) metro station bengaluru": {
+  "failed": true,
+  "at": 1788787823049
+ },
+ "q:yelachenahalli metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787823780
+ },
+ "q:yelachenahalli metro station, bangalore": {
+  "failed": true,
+  "at": 1788787825005
+ },
+ "q:yelachenahalli metro station": {
+  "failed": true,
+  "at": 1788787826846
+ },
+ "q:yelachenahalli metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787827545
+ },
+ "q:yelachenahalli metro station bengaluru": {
+  "failed": true,
+  "at": 1788787829155
+ },
+ "q:konanakunte cross metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787830118
+ },
+ "q:konanakunte cross metro station, bangalore": {
+  "failed": true,
+  "at": 1788787830657
+ },
+ "q:konanakunte cross metro station": {
+  "failed": true,
+  "at": 1788787832021
+ },
+ "q:konanakunte cross metro station, bengaluru": {
+  "failed": true,
+  "at": 1788787832736
+ },
+ "q:konanakunte cross metro station bengaluru": {
+  "failed": true,
+  "at": 1788787834529
+ },
+ "q:doddakallasandra metro station, bangalore, karnataka": {
+  "lat": 12.8846358,
+  "lng": 77.5522663,
+  "display_name": "Doddakallasandra Metro Station, Kanakapura Road, Anjanapura, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560062, India"
+ },
+ "q:vajarahalli metro station, bangalore, karnataka": {
+  "lat": 12.8771394,
+  "lng": 77.5444517,
+  "display_name": "Vajarahalli, Kanakapura Road, Judicial Layout, Vajrahalli, Talagattapura, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560109, India"
+ },
+ "q:thalaghattapura metro station, bangalore, karnataka": {
+  "failed": true,
+  "at": 1788787837209
+ },
+ "q:thalaghattapura metro station, bangalore": {
+  "failed": true,
+  "at": 1788787839077
+ },
+ "q:thalaghattapura metro station": {
+  "lat": 12.8712967,
+  "lng": 77.5385602,
+  "display_name": "Thalagattapura Metro Station, Kanakapura Road, Thalaghattapura, Vajrahalli, Talagattapura, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560062, India"
+ },
+ "q:silk institute metro station, bangalore, karnataka": {
+  "lat": 12.8610895,
+  "lng": 77.5297183,
+  "display_name": "Silk Institute Metro Station, Kanakapura Road, Talagattapura, Bengaluru South City Corporation, Bengaluru, Bangalore South, Bengaluru Urban, Karnataka, 560062, India"
+ },
+ "q:prestige kingfisher towers, lavelle road, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788933662340
+ },
+ "q:prestige kingfisher towers, lavelle road, bengaluru": {
+  "failed": true,
+  "at": 1788933663341
+ },
+ "q:prestige kingfisher towers, lavelle road": {
+  "failed": true,
+  "at": 1788933664442
+ },
+ "q:embassy lake terraces, hebbal, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788933665543
+ },
+ "q:embassy lake terraces, hebbal, bengaluru": {
+  "failed": true,
+  "at": 1788933666644
+ },
+ "q:embassy lake terraces, hebbal": {
+  "failed": true,
+  "at": 1788933667744
+ },
+ "q:snn clermont, hebbal, bengaluru, karnataka": {
+  "failed": true,
+  "at": 1788933668846
+ },
+ "q:snn clermont, hebbal, bengaluru": {
+  "failed": true,
+  "at": 1788933669947
+ },
+ "q:snn clermont, hebbal": {
+  "failed": true,
+  "at": 1788933671045
+ }
+}

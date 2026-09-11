@@ -1,0 +1,21 @@
+{
+  "name": "btl-bro-server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "lowdb": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "googleapis": "^140.0.1",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "csv-parse": "^5.5.6",
+    "xlsx": "^0.18.5"
+  }
+}
