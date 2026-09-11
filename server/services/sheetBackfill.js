@@ -62,6 +62,45 @@ export function queueBackfill(entries) {
   return queued;
 }
 
+// Queue a google-catchment surface entry: appends into the actual catchment
+// tab (e.g. "Apartment services") with Source=google and empty prices.
+// The row is keyed by tab|baseName so repeated surfacing updates in-place
+// rather than appending duplicates.
+export function queueGoogleSurface({ tab, baseName, name, lat, lng }) {
+  if (!tab || !baseName) return null;
+  const key = `gc_${tab}_${baseName}`.toLowerCase().replace(/\s+/g, '_');
+  const existing = dbHelpers.getAllBackfill().find((r) => r.key === key);
+  if (existing) {
+    dbHelpers.updateBackfillRow(existing.id, {
+      name,
+      lat: Number(lat) || existing.lat,
+      lng: Number(lng) || existing.lng,
+      status: 'pending',
+      attempts: 0,
+      last_error: '',
+    });
+    return existing;
+  }
+  const row = {
+    id: `gc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    key,
+    name,
+    type: 'google-catchment',
+    tab,
+    baseName,
+    lat: Number(lat) || 0,
+    lng: Number(lng) || 0,
+    source: 'google',
+    gmap_link: lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : '',
+    status: 'pending',
+    attempts: 0,
+    last_error: '',
+    created_at: new Date().toISOString(),
+  };
+  dbHelpers.addBackfillRow(row);
+  return row;
+}
+
 // POST one row to the Apps Script webhook. Returns true on success.
 async function pushRow(row) {
   const url = WEBHOOK_URL();
@@ -69,10 +108,20 @@ async function pushRow(row) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' }, // avoids Apps Script CORS preflight
-      body: JSON.stringify({
+    let body;
+    if (row.type === 'google-catchment') {
+      body = {
+        secret: process.env.SHEET_BACKFILL_SECRET || '',
+        kind: 'google-catchment',
+        tab: row.tab,
+        baseName: row.baseName,
+        name: row.name,
+        lat: row.lat,
+        lng: row.lng,
+        source: 'google',
+      };
+    } else {
+      body = {
         secret: process.env.SHEET_BACKFILL_SECRET || '',
         tab: BACKFILL_TAB,
         row: {
@@ -81,10 +130,15 @@ async function pushRow(row) {
           Lat: row.lat,
           Lng: row.lng,
           'GMap Link': row.gmap_link,
-          Source: row.source, // ← the last-column category
+          Source: row.source,
           'Selected At': row.created_at,
         },
-      }),
+      };
+    }
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -94,6 +148,15 @@ async function pushRow(row) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// Debounced auto-flush: only flush if 20s+ since last auto flush
+let lastAutoFlushAt = 0;
+export function flushGoogleSoon() {
+  const now = Date.now();
+  if (now - lastAutoFlushAt < 20000) return;
+  lastAutoFlushAt = now;
+  flushBackfill().catch((err) => console.warn('[SheetBackfill] auto-flush error:', err.message));
 }
 
 // Flush the queue: push every pending row. Called by POST /api/admin/sheet-backfill/flush

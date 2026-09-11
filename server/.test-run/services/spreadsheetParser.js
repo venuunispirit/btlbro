@@ -194,6 +194,10 @@ export function parseSpreadsheetCSV(csvText) {
 
 const HEADER_KEYWORDS = ['sl', 'name', 'services', 'service', 'gmap', 'map', 'link', 'pin', 'distance', 'address', 'notes', 'comment'];
 
+// Tabs the backfill webhook writes into (two-way sync). Never parsed as
+// catchments — otherwise every appended customer selection would be
+// diffed/deactivated on the next sheet sync.
+const SKIP_TAB_NAMES = ['crm backfill'];
 
 function cellText(v) {
   if (v === null || v === undefined) return '';
@@ -217,6 +221,11 @@ export function parseWorkbook(buffer) {
   for (const tabName of wb.SheetNames) {
     const sheet = wb.Sheets[tabName];
     if (!sheet) continue;
+    // Backfill target tab (and any future system tabs) are not catchments
+    if (SKIP_TAB_NAMES.includes(tabName.toLowerCase().trim())) {
+      tabs.push({ tab: tabName, records: 0, skipped: true, reason: 'backfill tab' });
+      continue;
+    }
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
     if (!rows.length) continue;
 
@@ -224,7 +233,7 @@ export function parseWorkbook(buffer) {
     const row1 = (rows[1] || []).map(cellText);
 
     // --- Locate the key columns from row 0 ---
-    let slIdx = -1, nameIdx = -1, servicesIdx = -1, gmapIdx = -1, pinIdx = -1, distIdx = -1;
+    let slIdx = -1, nameIdx = -1, servicesIdx = -1, gmapIdx = -1, pinIdx = -1, distIdx = -1, sourceIdx = -1;
     row0.forEach((h, idx) => {
       const t = h.toLowerCase();
       if (!t) return;
@@ -234,6 +243,7 @@ export function parseWorkbook(buffer) {
       else if (pinIdx === -1 && t.includes('pin')) pinIdx = idx;
       else if (distIdx === -1 && t.includes('distance')) distIdx = idx;
       else if (nameIdx === -1 && (t.includes('name') || t.includes('station') || t.includes('cafe') || t.includes('apartment'))) nameIdx = idx;
+      else if (sourceIdx === -1 && t.includes('source')) sourceIdx = idx;
     });
     // Some tabs put the "Sl No" header in row 1 instead of row 0 (metro layout)
     if (slIdx === -1 && /^sl/.test((row1[0] || '').toLowerCase())) slIdx = 0;
@@ -298,10 +308,18 @@ export function parseWorkbook(buffer) {
         if (key) services[key] = toNumber(r[idx]);
       });
 
+      // Source column: 'google' or 'inhouse' (default)
+      const rawSource = sourceIdx !== -1 ? cellText(r[sourceIdx]).toLowerCase() : '';
+      const source = rawSource.includes('google') ? 'google' : 'inhouse';
+
+      // For google-sourced rows, strip counter suffix "(N)" from name to build stable sheet_id
+      const idName = source === 'google' ? name.replace(/\s+\(\d+\)\s*$/, '').trim() : name;
+
       records.push({
         source_row: dataStart + i + 1,
-        sheet_id: `${type} | ${name}`,
+        sheet_id: `${type} | ${idName}`,
         name,
+        source,
         type,
         tab_name: tabName,
         sl_no: slIdx !== -1 ? cellText(r[slIdx]) : '',

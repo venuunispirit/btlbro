@@ -14,24 +14,37 @@
     "last_sync_message": null,
     "files_found": 0,
     "records_imported": 0,
-    "created_at": "2026-09-09T10:45:21.414Z",
-    "updated_at": "2026-09-09T10:45:21.414Z"
+    "created_at": "2026-09-11T14:29:58.339Z",
+    "updated_at": "2026-09-11T14:29:58.343Z"
   },
   "files": [],
   "records": [],
-  "sync_history": [
-    {
-      "status": "running",
-      "trigger_type": "manual",
-      "id": 1,
-      "started_at": "2026-09-09T10:45:21.550Z",
-      "admin": "Admin"
-    }
-  ],
+  "sync_history": [],
   "sync_errors": [],
   "orders": [],
+  "users": [],
+  "sessions": [],
+  "carts": [],
+  "wishlists": [],
+  "google_seen": {},
+  "shop_orders": [],
+  "products": [],
+  "site_content": {},
   "settings": {
     "per_location_price": 0,
-    "agency_fee": 10
+    "agency_fee": 10,
+    "payment": {
+      "gateway_enabled": false,
+      "gateway_provider": "razorpay",
+      "min_amount": 1,
+      "key_id": "",
+      "key_secret": "",
+      "currency": "INR"
+    },
+    "store": {
+      "min_order_amount": 0,
+      "shipping_flat": 0,
+      "gst_rate": 18
+    }
   }
 }

@@ -22,7 +22,7 @@ import { geocodePlaceVariants } from './geocode.js';
 // `services` holds the dynamic per-catchment service prices — compared as JSON.
 const DIFF_FIELDS = [
   'name', 'type', 'pin_code', 'distance_km', 'address', 'zone', 'city', 'phone', 'lat', 'lng',
-  'gmap_link', 'services',
+  'gmap_link', 'services', 'source',
   'digital_promotion', 'lift_promotion', 'stall_space', 'digital_screen', 'notice_board',
 ];
 
@@ -347,7 +347,7 @@ export function applyDiff({ toAdd, toUpdate, toReactivate = [], toDeactivate }, 
     const { source_row, ...data } = rec;
     data.is_active = true;
     data.sheet_id = data.sheet_id || data.name;
-    data.source = 'inhouse'; // from our Google Sheet → owned data
+    data.source = rec.source || 'inhouse';
     data.created_at = now;
     data.updated_at = now;
     dbHelpers.appendRecord(fileId, data, syncId);
@@ -357,8 +357,8 @@ export function applyDiff({ toAdd, toUpdate, toReactivate = [], toDeactivate }, 
   for (const { record, data } of toUpdate) {
     const { source_row, ...incoming } = data;
     Object.assign(record.data, incoming, {
-      is_active: true, // re-activates a row that returns after being removed
-      source: 'inhouse',
+      is_active: true,
+      source: incoming.source || record.data.source || 'inhouse',
       updated_at: now,
     });
     updated++;
@@ -366,7 +366,6 @@ export function applyDiff({ toAdd, toUpdate, toReactivate = [], toDeactivate }, 
 
   for (const { record } of toDeactivate) {
     record.data.is_active = false;
-    record.data.source = 'inhouse';
     record.data.updated_at = now;
     deactivated++;
   }
@@ -374,7 +373,11 @@ export function applyDiff({ toAdd, toUpdate, toReactivate = [], toDeactivate }, 
   // Reactivated rows count as updates (they appear in the sheet again)
   for (const { record, data } of toReactivate) {
     const { source_row, ...incoming } = data;
-    Object.assign(record.data, incoming, { is_active: true, source: 'inhouse', updated_at: now });
+    Object.assign(record.data, incoming, {
+      is_active: true,
+      source: incoming.source || record.data.source || 'inhouse',
+      updated_at: now,
+    });
     updated++;
   }
 

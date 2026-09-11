@@ -196,6 +196,11 @@ function getTypeGroupLabel(type) {
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Location';
 }
 
+// Strip counter suffix " (N)" from a name for display and dedup
+function stripCounter(name) {
+  return String(name || '').replace(/\s*\(\d+\)\s*$/, '').trim();
+}
+
 // Robust numeric parse — handles 10000, "₹10,000", empty cells (→ 0)
 function toNum(v) {
   const n = parseFloat(String(v ?? '').replace(/[₹,\s]/g, ''));
@@ -616,10 +621,11 @@ export default function MarketingTool() {
                 if (!String(d.name ?? '').trim()) continue;
                 // Skip rows the sync deactivated (removed from the sheet)
                 if (d.is_active === false) continue;
+                const isGoogle = (d.source || '').toLowerCase() === 'google';
                 all.push({
                   id: record.id,
-                  name: d.name || `Record ${record.id}`,
-                  fullName: d.name || `Record ${record.id}`,
+                  name: isGoogle ? stripCounter(d.name) : (d.name || `Record ${record.id}`),
+                  fullName: isGoogle ? stripCounter(d.name) : (d.name || `Record ${record.id}`),
                   // Pin code from the sheet's "Pin Code" column (when the sheet has one)
                   pinCode: String(d.pin_code ?? d.pincode ?? d.pin ?? '').replace(/\s+/g, ''),
                   // Distance straight from the sheet's Distance column (km) —
@@ -637,6 +643,9 @@ export default function MarketingTool() {
                   stall_space: toNum(d.stall_space),
                   digital_screen: toNum(d.digital_screen),
                   notice_board: toNum(d.notice_board),
+                  // Source tagging: google-sourced rows render as all-services-available
+                  source: isGoogle ? 'from google' : 'inhouse',
+                  onRequest: isGoogle,
                 });
               }
             } catch (e) { /* skip file */ }

@@ -8,6 +8,7 @@
 // missing or the upstream call fails. Biased to India via components=country:in.
 
 import express from 'express';
+import { surfaceNearby } from '../services/googleSurface.js';
 
 const router = express.Router();
 
@@ -144,6 +145,9 @@ router.get('/nearby', async (req, res) => {
       lng: p.location.longitude,
       types: p.types || [],
     }));
+
+    // Auto-surface non-inhouse places into catchment tabs (fire-and-forget)
+    surfaceNearby(places);
 
     res.json({ places });
   } catch (error) {

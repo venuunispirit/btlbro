@@ -39,6 +39,7 @@ const defaultData = {
   sessions: [],
   carts: [],
   wishlists: [],
+  google_seen: {},
   shop_orders: [],
   products: [],
   site_content: {},
@@ -419,6 +420,42 @@ export const dbHelpers = {
 
   getShopOrdersByUser(userId) {
     return (db.data.shop_orders || []).filter((o) => o.user_id === userId).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  },
+
+  // Distinct tab names among active records (for catchment-tab resolution)
+  getActiveTabNames() {
+    const tabs = new Set();
+    for (const r of (db.data.records || [])) {
+      if (r.data && r.data.is_active !== false && r.data.tab_name) tabs.add(r.data.tab_name);
+    }
+    return [...tabs];
+  },
+
+  // Check if a place name exists as an active inhouse record (source !== 'google')
+  isNameInhouse(name) {
+    const base = name.replace(/\s+\(\d+\)\s*$/, '').toLowerCase().trim();
+    for (const r of (db.data.records || [])) {
+      if (r.data && r.data.is_active !== false && r.data.name) {
+        const rBase = r.data.name.replace(/\s+\(\d+\)\s*$/, '').toLowerCase().trim();
+        if (rBase === base && r.data.source !== 'google') return true;
+      }
+    }
+    return false;
+  },
+
+  // ===== Google Nearby sighting counters =====
+
+  bumpGoogleSeen(key) {
+    if (!db.data.google_seen) db.data.google_seen = {};
+    const prev = db.data.google_seen[key] || 0;
+    const next = prev + 1;
+    db.data.google_seen[key] = next;
+    db.write();
+    return next;
+  },
+
+  getGoogleSeenCount(key) {
+    return (db.data.google_seen || {})[key] || 0;
   },
 
   // ===== Sheet backfill queue (customer selections → Google Sheet) =====
