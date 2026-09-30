@@ -55,7 +55,7 @@ function publicUser(u) {
   return {
     id: u.id, name: u.name, email: u.email, created_at: u.created_at,
     is_team: !!u.is_team,
-    role: u.role || (u.is_team ? 'member' : 'customer'),
+    role: u.role || (u.is_team ? 'member' : 'user'),
     designation: u.designation || '',
     phone: u.phone || '',
     is_active: u.is_active !== false,
@@ -94,6 +94,11 @@ router.post('/login', (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     if (user.is_team && user.is_active === false) {
+      // Clearer message when the dept cascade is what turned them off
+      const dept = user.department_id ? dbHelpers.getDepartmentById(user.department_id) : null;
+      if (dept && dept.is_active === false && user.role !== 'super_admin') {
+        return res.status(403).json({ error: 'Your department has been disabled. Contact your administrator.' });
+      }
       return res.status(403).json({ error: 'This staff account is deactivated. Contact the manager.' });
     }
     const token = newToken();

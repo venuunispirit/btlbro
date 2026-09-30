@@ -1,0 +1,156 @@
+/* Admin panel — global styles that inline style objects cannot express.
+ *
+ * Everything else in the admin lives in src/pages/admin/theme.js. These few
+ * rules are here because they need a document-level selector: a focus ring
+ * that applies to every control without each one opting in, and a table
+ * behaviour that has to target elements the tabs render.
+ *
+ * Scope is deliberately tight. The public site and WebsiteTab must not inherit
+ * any of this. */
+
+.admin-root {
+  background: #faf9f7;
+  color: #161616;
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Keyboard focus. The admin's controls are inline-styled buttons and inputs
+ * with no :focus rule, so keyboard users get almost no visible focus at all —
+ * they tab through the whole panel blind. :focus-visible keeps it off for mouse
+ * users, who do not need a ring on every click. */
+.admin-root :focus-visible {
+  outline: 2px solid #f2701d;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* A disabled control should look disabled, not just refuse clicks. */
+.admin-root button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Native checkboxes and radios paint themselves the platform's blue, which
+ * is the one colour the design language never uses. accent-color repaints
+ * just the tick/radio without replacing the control with a custom widget. */
+.admin-root input[type='checkbox'],
+.admin-root input[type='radio'] {
+  accent-color: #f2701d;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* Inputs that are deliberately borderless — the topbar search sits inside a
+   bordered pill, RecordMoney's amount inside a bordered box. Their container
+   already carries the focus treatment, so a ring on the inner element would
+   nest a second ring inside the first. */
+.admin-root input.bare-input:focus {
+  border-color: inherit !important;
+  box-shadow: none !important;
+}
+
+/* Text inputs are inline-styled with a fixed border and no :focus rule, so
+ * the only clue a field was focused came from the caret. The !important is
+ * the point: an inline style beats a selector any other way.
+ * `:not([type=...])` rather than `[type=text]`, because an <input> with no
+ * type attribute does not match an attribute selector — and most of the
+ * inputs in this panel have no type attribute at all. */
+.admin-root input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+.admin-root textarea:focus,
+.admin-root select:focus {
+  border-color: #f2701d !important;
+  box-shadow: 0 0 0 3px rgba(242, 112, 29, 0.13) !important;
+}
+
+/* Long reference numbers and emails must not stretch a table column. */
+.admin-root table {
+  table-layout: auto;
+}
+.admin-root td,
+.admin-root th {
+  overflow-wrap: anywhere;
+}
+
+/* Wide data tables scroll horizontally inside their card instead of blowing
+ * out the page width and forcing the whole panel to scroll sideways. */
+.admin-root .scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* <details> disclosure chevron points down once the section is open. */
+.admin-root details[open] .open-chevron {
+  transform: rotate(90deg);
+}
+
+/* Two-pane tab layouts (form beside a live preview) stack instead of
+   squeezing both columns once the viewport is too narrow for them. */
+@media (max-width: 1100px) {
+  .admin-root .split {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Pane switch (Send / Receive). Hover needs a selector, which an inline
+ * style object cannot express — the base state stays inline so the active
+ * colour still reads next to the rest of the component. */
+.admin-root .seg-btn {
+  transition: background .15s, color .15s, box-shadow .15s;
+}
+.admin-root .seg-btn:not(.seg-on):hover {
+  background: #fff4ec;
+  color: #c2410c;
+}
+.admin-root .seg-btn.seg-on:hover {
+  background: #e85d0a;
+}
+
+/* QR dropzone: invites a drop, a click or a paste. */
+.admin-root .dropzone {
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.admin-root .dropzone:hover {
+  border-color: #f2701d;
+  background: #fff8f3;
+}
+.admin-root .dropzone.is-over {
+  border-color: #f2701d;
+  background: #fff4ec;
+  box-shadow: 0 0 0 3px rgba(242, 112, 29, 0.12);
+}
+
+/* A scanned QR turns the dropzone itself into the confirmation: green, solid,
+ * with the UPI ID shown in place. Declared after :hover so the success state is
+ * not re-tinted orange when the pointer happens to be over the row. */
+.admin-root .dropzone.is-done,
+.admin-root .dropzone.is-done:hover {
+  border-style: solid;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  cursor: default;
+}
+
+/* Numeric columns line up on the decimal point rather than the first digit. */
+.admin-root .tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Respect a reduced-motion preference: the toast entrance is decorative. */
+@media (prefers-reduced-motion: reduce) {
+  .admin-root *,
+  .admin-root *::before,
+  .admin-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@keyframes btlToastIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

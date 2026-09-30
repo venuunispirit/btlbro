@@ -14,7 +14,7 @@
 
 import { dbHelpers } from '../db.js';
 
-const ROLE_LEVEL = { member: 0, manager: 1, super_admin: 2 };
+const ROLE_LEVEL = { member: 0, recee: 0, bd_executive: 1, ops_executive: 1, manager: 1, recee_manager: 1, bdm: 2, ops_manager: 2, super_admin: 3 };
 
 function resolveSession(req) {
   const header = req.headers.authorization || '';
@@ -71,5 +71,23 @@ export function optionalStaff(req, res, next) {
   const resolved = resolveSession(req);
   req.staff = resolved ? resolved.user : null;
   req.sessionToken = resolved ? resolved.token : null;
+  next();
+}
+// Roles allowed to move money or settle vendor bills. Exported so every money
+// route (ledger, vendors) shares one list instead of drifting apart.
+export const PAYOUT_ROLES = new Set(['manager', 'bdm', 'ops_manager', 'super_admin']);
+
+// Deliberately NOT the level-based requireManager: that admits recee_manager and
+// ops_executive, which the payment APIs reject. Anyone with payout rights is
+// moving real money, so the check is an explicit allowlist.
+export function requirePayoutRole(req, res, next) {
+  const resolved = resolveSession(req);
+  if (!resolved) return res.status(401).json({ error: 'Staff sign-in required' });
+  if (!PAYOUT_ROLES.has(resolved.user.role)) {
+    return res.status(403).json({ error: 'Payments access requires Manager or above' });
+  }
+  req.user = resolved.user;
+  req.staff = resolved.user;
+  req.sessionToken = resolved.token;
   next();
 }

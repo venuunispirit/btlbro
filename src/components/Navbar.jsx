@@ -99,6 +99,10 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
       setShowPass(false);
       setShowConfirm(false);
       window.dispatchEvent(new CustomEvent("btl-auth-change", { detail: { user: result.user } }));
+      // Team members land in their own dashboard based on role (no separate /admin
+      if (result.user?.is_team && authTab === "signin") {
+        onNavigate?.(result.user.role === "recee" ? "/recee" : "/dashboard");
+      }
     } catch (err) {
       setAuthError(err.message || "Something went wrong");
     } finally {
@@ -264,7 +268,7 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
               <div className={`auth-field-group ${authTab === "register" ? "auth-field-group-open" : ""}`}>
                 <div className="auth-field">
                   <label className="auth-label">Full Name</label>
-                  <input className="auth-input" type="text" placeholder="Priya Sharma" value={authForm.name} onChange={(e) => setAuthForm((f) => ({ ...f, name: e.target.value }))} required />
+                  <input className="auth-input" type="text" placeholder="Priya Sharma" value={authForm.name} onChange={(e) => setAuthForm((f) => ({ ...f, name: e.target.value }))} required={authTab === "register"} />
                 </div>
               </div>
               <div className="auth-field">
@@ -284,7 +288,7 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
                 <div className="auth-field">
                   <label className="auth-label">Confirm Password</label>
                   <div className="auth-input-wrap">
-                    <input className="auth-input auth-input-pass" type={showConfirm ? "text" : "password"} placeholder="Re-enter password" value={authForm.confirmPassword} onChange={(e) => setAuthForm((f) => ({ ...f, confirmPassword: e.target.value }))} required minLength={6} />
+                    <input className="auth-input auth-input-pass" type={showConfirm ? "text" : "password"} placeholder="Re-enter password" value={authForm.confirmPassword} onChange={(e) => setAuthForm((f) => ({ ...f, confirmPassword: e.target.value }))} required={authTab === "register"} minLength={6} />
                     <button type="button" className="auth-eye" onClick={() => setShowConfirm((v) => !v)} tabIndex={-1}>
                       {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>

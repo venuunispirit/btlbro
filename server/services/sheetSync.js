@@ -125,12 +125,24 @@ export async function fetchSheetCsv(spreadsheetId, gid) {
 // Retries transient Google failures; on final failure callers fall back to the
 // legacy single-tab CSV fetch (fetchSheetCsv).
 export async function fetchWorkbook(spreadsheetId) {
-  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
-  const ATTEMPTS = 3;
+  const ATTEMPTS = 5;
   const RETRY_STATUS = new Set([400, 408, 429, 500, 502, 503, 504]);
+  const MIN_SIZE = 50000; // A real workbook with any data is >50KB; throttled responses are ~17KB
   let lastStatus = null;
 
+  // Two Google endpoints to try — they use separate rate-limit pools
+  const TARGETS = [
+    { label: 'export', base: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export` },
+    { label: 'gviz', base: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq` },
+  ];
+
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    const target = TARGETS[(attempt - 1) % TARGETS.length];
+    const cacheBuster = `_nocache=${Date.now()}`;
+    const url = target.label === 'export'
+      ? `${target.base}?format=xlsx&${cacheBuster}`
+      : `${target.base}?tqx=out:xlsx&${cacheBuster}`;
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     let response;
@@ -138,12 +150,16 @@ export async function fetchWorkbook(spreadsheetId) {
       response = await fetch(url, {
         redirect: 'follow',
         signal: controller.signal,
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BTLbroSync/1.0)' },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; BTLbroSync/1.0)',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
       });
     } catch (err) {
       clearTimeout(timeout);
       if (attempt < ATTEMPTS) {
-        await new Promise((r) => setTimeout(r, 2000 * attempt));
+        await new Promise((r) => setTimeout(r, 3000 * attempt));
         continue;
       }
       if (err.name === 'AbortError') throw new SheetSyncError('timeout', 'Google Sheets did not respond within 30 seconds.');
@@ -157,7 +173,13 @@ export async function fetchWorkbook(spreadsheetId) {
       if (buf.length > 0 && buf[0] === 0x3c /* '<' */) {
         throw new SheetSyncError('permission', 'The sheet is not publicly readable. Share it as "Anyone with the link can view".');
       }
-      console.log(`[SheetSync] Fetched workbook (${buf.length} bytes)`);
+      // Google sometimes returns a truncated/partial XLSX when rate-limiting (~17KB vs 180KB+).
+      if (buf.length < MIN_SIZE && attempt < ATTEMPTS) {
+        console.warn(`[SheetSync] ${target.label} attempt ${attempt} returned truncated response (${buf.length} bytes < ${MIN_SIZE}) — retrying with ${TARGETS[attempt % TARGETS.length].label}…`);
+        await new Promise((r) => setTimeout(r, 3000 * attempt));
+        continue;
+      }
+      console.log(`[SheetSync] Fetched workbook via ${target.label} (${buf.length} bytes)`);
       return buf;
     }
 
@@ -348,6 +370,11 @@ export function applyDiff({ toAdd, toUpdate, toReactivate = [], toDeactivate }, 
     data.is_active = true;
     data.sheet_id = data.sheet_id || data.name;
     data.source = rec.source || 'inhouse';
+    // Google-sourced rows need a recee visit to verify venue/prices before selling
+    if ((data.source || '').toLowerCase().includes('google')) {
+      data.needs_recee = true;
+      if (!data.recee_status) data.recee_status = 'pending';
+    }
     data.created_at = now;
     data.updated_at = now;
     dbHelpers.appendRecord(fileId, data, syncId);
@@ -361,6 +388,11 @@ export function applyDiff({ toAdd, toUpdate, toReactivate = [], toDeactivate }, 
       source: incoming.source || record.data.source || 'inhouse',
       updated_at: now,
     });
+    // Google rows always need recee; keep an existing in_progress/done unless unset
+    if ((record.data.source || '').toLowerCase().includes('google')) {
+      record.data.needs_recee = true;
+      if (!record.data.recee_status) record.data.recee_status = 'pending';
+    }
     updated++;
   }
 
@@ -378,6 +410,10 @@ export function applyDiff({ toAdd, toUpdate, toReactivate = [], toDeactivate }, 
       source: incoming.source || record.data.source || 'inhouse',
       updated_at: now,
     });
+    if ((record.data.source || '').toLowerCase().includes('google')) {
+      record.data.needs_recee = true;
+      if (!record.data.recee_status) record.data.recee_status = 'pending';
+    }
     updated++;
   }
 

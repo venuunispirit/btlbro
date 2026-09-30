@@ -34,3 +34,18 @@ export function ensureSuperAdmin() {
     is_team: true,
   });
 }
+
+// One-time data migration: customers used to be stored with role 'member'.
+// Relabel non-team accounts to 'user' so staff/`member` roles stay unambiguous.
+export function migrateCustomerRoles() {
+  let changed = 0;
+  for (const u of dbHelpers.getAllUsers()) {
+    if (!u.is_team && (!u.role || u.role === 'member')) {
+      u.role = 'user';
+      changed++;
+    }
+  }
+  if (changed) dbHelpers.write();
+  if (changed) console.log(`👥  Roled ${changed} customer account(s) as 'user'`);
+  return changed;
+}

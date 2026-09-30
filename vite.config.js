@@ -1,16 +1,36 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+// Which API the dev server proxies to.
+//
+// BTLbro's own server listens on 8082 (see server/index.js and the `dev:api`
+// script). 8081 is deliberately NOT the default: it is commonly taken by another
+// local project, and proxying there fails in a very confusing way — every
+// request 404s as {"message":"API route not found"} and the admin dashboard
+// just looks empty, with no hint that it is talking to the wrong server.
+// The old 8081 default caused exactly that, so the port is now declared here
+// once and loudly logged at startup instead.
+const API_PORT = process.env.API_PORT || 8082;
+const apiTarget = `http://localhost:${API_PORT}`;
+
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    port: 5174,
     open: true,
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/uploads": {
+        target: apiTarget,
         changeOrigin: true,
       },
     },
   },
 });
+
+console.log(`\n  BTLbro dev server proxying /api -> ${apiTarget}`);
+console.log('           Start the API with: cd server && PORT=8082 npm run dev\n');
+

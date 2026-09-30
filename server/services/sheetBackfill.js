@@ -23,6 +23,13 @@
 // the webhook (retries up to 3 times with backoff).
 
 import { dbHelpers } from '../db.js';
+import { buildGmapLink } from './gmapLink.js';
+import {
+  isSheetWriterConfigured,
+  resolveSpreadsheetForBackfill,
+  upsertGoogleCatchment,
+  appendCrmRow,
+} from './sheetWriter.js';
 
 const WEBHOOK_URL = () => (process.env.SHEET_BACKFILL_WEBHOOK_URL || '').trim();
 const MAX_ATTEMPTS = 3;
@@ -48,9 +55,7 @@ export function queueBackfill(entries) {
       distance_km: Number(e.distance_km) || 0,
       pin_code: String(e.pin_code || '').replace(/\s+/g, ''),
       source,
-      gmap_link: e.lat && e.lng
-        ? `https://www.google.com/maps?q=${e.lat},${e.lng}`
-        : '',
+      gmap_link: buildGmapLink({ name, lat: Number(e.lat) || 0, lng: Number(e.lng) || 0 }),
       status: 'pending',
       attempts: 0,
       last_error: '',
@@ -66,7 +71,7 @@ export function queueBackfill(entries) {
 // tab (e.g. "Apartment services") with Source=google and empty prices.
 // The row is keyed by tab|baseName so repeated surfacing updates in-place
 // rather than appending duplicates.
-export function queueGoogleSurface({ tab, baseName, name, lat, lng }) {
+export function queueGoogleSurface({ tab, baseName, name, lat, lng, place_id }) {
   if (!tab || !baseName) return null;
   const key = `gc_${tab}_${baseName}`.toLowerCase().replace(/\s+/g, '_');
   const existing = dbHelpers.getAllBackfill().find((r) => r.key === key);
@@ -75,6 +80,7 @@ export function queueGoogleSurface({ tab, baseName, name, lat, lng }) {
       name,
       lat: Number(lat) || existing.lat,
       lng: Number(lng) || existing.lng,
+      place_id: existing.place_id || place_id,
       status: 'pending',
       attempts: 0,
       last_error: '',
@@ -90,8 +96,9 @@ export function queueGoogleSurface({ tab, baseName, name, lat, lng }) {
     baseName,
     lat: Number(lat) || 0,
     lng: Number(lng) || 0,
+    place_id: place_id || '',
     source: 'google',
-    gmap_link: lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : '',
+    gmap_link: buildGmapLink({ name: name || baseName, lat: Number(lat) || 0, lng: Number(lng) || 0, place_id: String(place_id || '').trim() }),
     status: 'pending',
     attempts: 0,
     last_error: '',
@@ -109,7 +116,7 @@ async function pushRow(row) {
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     let body;
-    if (row.type === 'google-catchment') {
+if (row.type === 'google-catchment') {
       body = {
         secret: process.env.SHEET_BACKFILL_SECRET || '',
         kind: 'google-catchment',
@@ -118,6 +125,9 @@ async function pushRow(row) {
         name: row.name,
         lat: row.lat,
         lng: row.lng,
+        place_id: row.place_id,
+        gmap_link: row.gmap_link,
+        gmapLink: row.gmap_link,
         source: 'google',
       };
     } else {
@@ -161,18 +171,56 @@ export function flushGoogleSoon() {
 
 // Flush the queue: push every pending row. Called by POST /api/admin/sheet-backfill/flush
 // (admin button) and best-effort right after an order is placed.
+//
+// Primary path: direct Google Sheets API writes (service account — no webhook).
+// Fallback: the old Apps Script webhook when the URL is still configured.
+// No path configured → rows stay queued (attempts NOT burned) for a later flush.
 export async function flushBackfill() {
   const pending = dbHelpers.getPendingBackfill();
-  if (pending.length === 0) return { pushed: 0, failed: 0, remaining: 0, configured: !!WEBHOOK_URL() };
-  // No webhook yet → no-op. Rows stay queued (attempts NOT burned) so the
-  // agency can set the URL later or export the CSV manually.
-  if (!WEBHOOK_URL()) return { pushed: 0, failed: 0, remaining: pending.length, configured: false };
+  const sheetWriterOn = isSheetWriterConfigured();
+  const webhookOn = !!WEBHOOK_URL();
+  const configured = sheetWriterOn || webhookOn;
+
+  if (pending.length === 0) {
+    return { pushed: 0, failed: 0, remaining: 0, configured, mode: sheetWriterOn ? 'sheets-api' : (webhookOn ? 'webhook' : 'none') };
+  }
+  if (!configured) {
+    return { pushed: 0, failed: 0, remaining: pending.length, configured: false, mode: 'none' };
+  }
+
+  let spreadsheetId = null;
+  if (sheetWriterOn) {
+    try {
+      spreadsheetId = await resolveSpreadsheetForBackfill();
+    } catch (err) {
+      console.warn('[SheetBackfill] resolving spreadsheet failed:', err.message);
+    }
+  }
 
   let pushed = 0, failed = 0;
   for (const row of pending) {
     try {
-      await pushRow(row);
-      dbHelpers.updateBackfillRow(row.id, { status: 'synced', last_error: '', attempts: row.attempts + 1 });
+      if (sheetWriterOn && spreadsheetId) {
+        // Direct Sheets API write — no webhook involved.
+        if (row.type === 'google-catchment') {
+          await upsertGoogleCatchment({
+            spreadsheetId,
+            tab: row.tab,
+            baseName: row.baseName,
+            name: row.name,
+            lat: row.lat,
+            lng: row.lng,
+          });
+        } else {
+          await appendCrmRow({ spreadsheetId, row });
+        }
+      } else if (webhookOn) {
+        // Legacy fallback: Apps Script webhook.
+        await pushRow(row);
+      } else {
+        throw new Error('no write path');
+      }
+      dbHelpers.updateBackfillRow(row.id, { status: 'synced', last_error: '', attempts: (row.attempts || 0) + 1, pushed_at: new Date().toISOString() });
       pushed++;
     } catch (err) {
       const attempts = (row.attempts || 0) + 1;
@@ -187,7 +235,7 @@ export async function flushBackfill() {
     }
   }
   const remaining = dbHelpers.getPendingBackfill().length;
-  return { pushed, failed, remaining, configured: !!WEBHOOK_URL() };
+  return { pushed, failed, remaining, configured, mode: sheetWriterOn ? 'sheets-api' : (webhookOn ? 'webhook' : 'none') };
 }
 
 // CSV of the whole queue — manual fallback while the webhook is not configured

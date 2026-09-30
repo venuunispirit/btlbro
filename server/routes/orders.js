@@ -11,21 +11,54 @@
 import express from 'express';
 import { dbHelpers } from '../db.js';
 import { queueBackfill, flushBackfill } from '../services/sheetBackfill.js';
-import { optionalStaff } from '../middleware/staffAuth.js';
+import { optionalStaff, requireStaff } from '../middleware/staffAuth.js';
 
 const router = express.Router();
 
-// GET all orders — staff-scoped: members see ONLY their assigned orders,
-// managers/super admins (or no staff session) see all.
+// A signed-in customer (not staff). Same session table as /api/auth, so a
+// customer token is enough to read back their own orders.
+function resolveCustomer(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  const session = token && dbHelpers.getSession(token);
+  if (!session) return null;
+  return dbHelpers.getUserById(session.user_id) || null;
+}
+
+// GET all orders — product shop orders only. The marketing tool
+// pipeline is entirely in Leads; orders are only from products.
+//
+// Access: a staff member sees orders (role-scoped below). A signed-in
+// *customer* sees only the orders carrying their own email or phone. An
+// anonymous caller sees nothing — previously this route was readable by anyone
+// and returned every customer's name, email, phone, address, items and total.
 router.get('/', optionalStaff, (req, res) => {
   try {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
-    let orders = dbHelpers.getOrders();
+
+    let orders = (dbHelpers.getShopOrders() || []).map((o) => ({ ...o, kind: 'shop' }));
+
     const role = req.staff ? req.staff.role : null;
-    if (req.staff && role === 'member') {
-      orders = orders.filter((o) => Number(o.assigned_to) === Number(req.staff.id));
+    if (req.staff) {
+      if (role === 'ops_executive' || role === 'member') {
+        orders = orders.filter((o) => Number(o.assigned_to) === Number(req.staff.id));
+      } else if (role === 'bd_executive' || role === 'bdm') {
+        orders = [];
+      }
+    } else {
+      const customer = resolveCustomer(req);
+      if (!customer) {
+        return res.status(401).json({ error: 'Sign in to view orders' });
+      }
+      const email = String(customer.email || '').toLowerCase();
+      const phone = String(customer.phone || '').replace(/\D/g, '').slice(-10);
+      orders = orders.filter((o) => {
+        const oEmail = String(o.email || o.user?.email || o.contactEmail || '').toLowerCase();
+        const oPhone = String(o.phone || o.user?.phone || o.address?.phone || '').replace(/\D/g, '').slice(-10);
+        return (email && oEmail === email) || (phone && oPhone === phone);
+      });
     }
     res.json({ orders });
   } catch (error) {
@@ -70,11 +103,12 @@ router.post('/', (req, res) => {
   }
 });
 
-// PUT update order
-router.put('/:id', (req, res) => {
+// PUT update order (product shop orders)
+// Was unauthenticated: anyone could flip any order's status or assignment.
+router.put('/:id', requireStaff, (req, res) => {
   try {
     const updates = req.body || {};
-    const order = dbHelpers.getOrders().find(o => o.id === Number(req.params.id));
+    const order = (dbHelpers.getShopOrders() || []).find(o => o.id === Number(req.params.id));
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
     // Assignment must reference a real team member
@@ -83,8 +117,8 @@ router.put('/:id', (req, res) => {
       if (!member || !member.is_team) return res.status(400).json({ error: 'Assigned member not found' });
       const clean = { ...updates, assigned_to: Number(updates.assigned_to), assigned_at: new Date().toISOString() };
       if (updates.assigned_by !== undefined) clean.assigned_by = Number(updates.assigned_by);
-      const updated = dbHelpers.updateOrder(req.params.id, clean);
-      return res.json({ success: true, order: updated });
+      const updated = dbHelpers.updateShopOrder(req.params.id, clean);
+      return res.json({ success: true, order: { ...updated, kind: 'shop' } });
     }
     if (updates.assigned_to === '' || updates.assigned_to === null) {
       updates.assigned_to = null;
@@ -92,18 +126,24 @@ router.put('/:id', (req, res) => {
       updates.assigned_at = null;
     }
 
-    const updated = dbHelpers.updateOrder(req.params.id, updates);
-    res.json({ success: true, order: updated });
+    const updated = dbHelpers.updateShopOrder(req.params.id, updates);
+    res.json({ success: true, order: { ...updated, kind: 'shop' } });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update order', details: error.message });
   }
 });
 
-// DELETE order
-router.delete('/:id', (req, res) => {
+// DELETE order (product shop orders)
+// Two bugs here: no auth, and it called deleteOrder, which filters
+// db.data.orders — a different collection from the shop_orders this route
+// lists. So it reported success while removing nothing.
+router.delete('/:id', requireStaff, (req, res) => {
   try {
-    dbHelpers.deleteOrder(req.params.id);
-    res.json({ success: true });
+    const orders = dbHelpers.getShopOrders() || [];
+    const order = orders.find((o) => o.id === Number(req.params.id));
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    dbHelpers.deleteShopOrder(order.id);
+    res.json({ success: true, deleted: order.id });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete order', details: error.message });
   }

@@ -10,6 +10,7 @@ import express from 'express';
 import { syncSheet, SheetSyncError } from '../services/sheetSync.js';
 import { dbHelpers } from '../db.js';
 import { flushBackfill, backfillCsv } from '../services/sheetBackfill.js';
+import { isSheetWriterConfigured, testConnection } from '../services/sheetWriter.js';
 
 const router = express.Router();
 
@@ -90,10 +91,23 @@ router.get('/sheet-backfill', (req, res) => {
       pending: rows.filter((r) => r.status === 'pending').length,
       synced: rows.filter((r) => r.status === 'synced').length,
       failed: rows.filter((r) => r.status === 'failed').length,
-      configured: Boolean(process.env.SHEET_BACKFILL_WEBHOOK_URL),
+      mode: isSheetWriterConfigured() ? 'sheets-api' : (process.env.SHEET_BACKFILL_WEBHOOK_URL ? 'webhook' : 'none'),
+      configured: isSheetWriterConfigured() || Boolean(process.env.SHEET_BACKFILL_WEBHOOK_URL),
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to read backfill queue', details: error.message });
+  }
+});
+
+// ========== GET /api/admin/sheet-writer/test ==========
+// Verify service-account credentials and spreadsheet access — for the Admin
+// Panel Drive tab to show a green/red indicator next to "Backfill write path".
+router.get('/sheet-writer/test', async (req, res) => {
+  try {
+    const result = await testConnection();
+    res.json({ success: result.ok, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

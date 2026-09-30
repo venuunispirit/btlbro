@@ -8,6 +8,10 @@ import QuickCheckout from "./pages/QuickCheckout.jsx";
 import ProductsPage from "./pages/ProductsPage.jsx";
 import ShopCheckout from "./pages/ShopCheckout.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import ReceeScreen from "./pages/ReceeScreen.jsx";
+import VendorPortal from "./pages/VendorPortal.jsx";
+import { getUser } from "./services/shopClient.js";
 
 function useGlobalCart() {
   const [cartCount, setCartCount] = useState(() => {
@@ -51,12 +55,31 @@ function Router() {
     window.dispatchEvent(new CustomEvent("btl-open-cart"));
   }, []);
 
+  // Login redirects by account: recee team → /recee, other staff → /dashboard
   const handleNavigate = useCallback((p) => {
     navigate(p);
   }, []);
-
-  if (path === "/admin") {
-    return <AdminPanel />;
+  if (path === "/login") {
+    return <LoginPage onNavigate={handleNavigate} />;
+  }
+  // Vendors have their own identity (/api/vendors/*), so this route renders
+  // before the staff gate and never inspects getUser() — a vendor is neither
+  // a team member nor a customer.
+  if (path === "/vendor") {
+    return <VendorPortal />;
+  }
+  if (path === "/recee") {
+    return <ReceeScreen onNavigate={handleNavigate} />;
+  }
+  if (path === "/dashboard" || path === "/admin") {
+    const user = getUser();
+    if (user && user.is_team) {
+      if (user.role === "recee") {
+        return <ReceeScreen onNavigate={handleNavigate} />;
+      }
+      return <AdminPanel />;
+    }
+    return <Dashboard onNavigate={handleNavigate} />;
   }
 
   const hideNavbar = path === "/customize" || path === "/checkout" || path === "/shop/checkout";
@@ -78,7 +101,6 @@ function Router() {
       {path === "/checkout" && <QuickCheckout />}
       {path === "/products" && <ProductsPage />}
       {path === "/shop/checkout" && <ShopCheckout />}
-      {path === "/dashboard" && <Dashboard onNavigate={handleNavigate} />}
       {(!path || path === "/") && <App activeTab={activeTab} setActiveTab={setActiveTab} />}
     </>
   );

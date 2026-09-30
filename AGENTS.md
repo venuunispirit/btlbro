@@ -8,7 +8,7 @@ checkout consume.
 
 ## How to run
 
-- Frontend: `npm run dev` (root) → http://localhost:5173 (Vite proxies `/api` → :3001)
+- Frontend: `npm run dev` (root) → http://localhost:5173 (Vite proxies `/api` → :8081)
 - Server: `npm run dev` in `server/` (needs `server/.env`, see `.env.example`)
 - Test: `node sheetSync.test.mjs` in `server/` (mocks Google's CSV export; never touches real db.json)
 - There is no shared root package.json/node_modules — root and `server/` are independent.
@@ -64,8 +64,45 @@ drive (delegates to `GoogleDriveTab`), analytics (placeholder), settings.
 - Optimistic UI — local state mutated + fire-and-forget fetch.
 
 ### GoogleDriveTab.jsx (inside AdminPanel)
-Manage sheet connection + sync: connect URL, preview (dry-run), sync, browse
-files/data, auto-sync toggle + frequency, sync history. Uses `/api/admin/google-drive/*` and `/api/admin/sync-google-sheet`, `/api/admin/preview-google-sheet-sync`, `/api/admin/sheet-sync/status`.
+Manage sheet connection + sync. Uses `/api/admin/google-drive/*`,
+`/api/admin/sync-google-sheet`, `/api/admin/preview-google-sheet-sync`,
+`/api/admin/sheet-sync/status`. Current layout: **Card 1 "Google Sheet & Drive
+Sync"** = 2-col grid (Master Sheet pills + Preview/Sync left, Drive Connection
+right), sync-result/validation panels below full-width; **Card 2 "Sync
+Overview"** = 3-col StatPill grid (Synced Files / Last Sync / Backfill) whose eye
+icons open a **modal with tabs** (Sync History, Backfill Queue). File data
+viewer is a modal (`showFileModal`), not inline. Shared `StatPill` component;
+auto-sync toggle persists immediately; file-data search debounced 300ms; CSV
+export prepends UTF-8 BOM; responsive `.gd-2col`/`.gd-3col` collapse under
+1100px.
+
+### WebsiteTab.jsx (inside AdminPanel)
+Website CMS: `getContent`/`saveBlock`/`uploadImage`/products CRUD from api.js.
+**3-col layout** (comment previously said "4-column" — it's `180px 1fr 1fr`):
+col1 = section list (search-filterable, ~21 `SECTION_PRESETS`), col2 =
+`FieldsEditor`, col3 = sticky **LivePreview**. Fields and preview share equal
+width (`1fr 1fr`) so the page stays balanced. Also has a Products & Pricing
+sub-view (`activeView` toggle).
+
+**UX rules to keep:**
+- **Live preview: fields render in the preview WITHOUT saving.** Parent holds
+  `drafts` keyed by section; `FieldsEditor` is controlled (`value`/`onChange`),
+  `onChange` forwards `toDraftShape(next, section)` (json_array fields parsed to
+  arrays, invalid JSON left as string while typing). `currentContent =
+  drafts[activeSection] || content[activeSection]`. Save clears the draft.
+  Switching sections keeps unsaved drafts (keyed column).
+- **Field order mirrors the preview layout** (e.g. hero shows `hero_image` first
+  to match image-at-top preview). When adding/changing a preset field, check the
+  LivePreview render order first.
+- Section list dot: green = saved data, orange = unsaved draft.
+- `ImageUpload` (from api.js) is separate from the public site's uploader.
+
+## Admin design language (apply to ANY admin tab)
+Warm Neutrals, NOT generic grays: borders `#E7E2D8`, fills `#FAF9F7`, text
+`#161616/#4A4A4A/#949494`, accent `#F2701D` (buttons/focus), radius 8–14,
+Inter 11–14px. Green `#10B981` for success, amber `#FEF3C7/#B45309` for unsaved.
+Avoid `#EEE/#F0F0F0/#111/#333/#888/#999` gray fills. Toast/banner instead of
+`alert()` where feasible; empty states styled, not bare lines.
 
 ## Server — API (index.js)
 
@@ -84,6 +121,42 @@ Mounts (CORS allows localhost:5173/3000, JSON body):
 
 ### DB layer (db.js)
 lowdb JSON file at `server/data/db.json`, `dbHelpers` object (SQL-ish) over a single in-memory `db.data`. Collections: `integration` (connection/config), `files` (synced spreadsheets), `records` (location rows), `sync_history`, `sync_errors`, `orders`, `settings`. Records have `data.is_active` for soft delete (see sync).
+
+### Companies vs Accounts — TWO SEPARATE TABS, do not conflate
+
+| Tab | Route | Owns |
+|---|---|---|
+| **Companies** | `routes/companies.js` | The customer *relationship*: business records, representative, leads, chat, calls, notes, activity timeline |
+| **Accounts** | `routes/upiPayments.js` + `companies.js` | The *money*: ledger, reconciliation, outstanding, which company a movement belongs to |
+
+A company is a *customer business*, not BTLbro itself. Leads are the individual
+campaigns a company submits; chat/notes roll up under it. **The Companies
+timeline must NOT include payment events** — reconciliation is Accounts' job.
+
+- Companies auto-create from `lead.businessName` on every lead insert (checkout
+  **and** the public `POST /api/leads`), then dedupe on `name_key`.
+- `name_key` (`dbHelpers.companyKey`) lowercases, strips punctuation and common
+  legal suffixes (pvt/ltd/llp/co/…). It is deliberately **not** fuzzy — "Cafe
+  Coffee" and "Cafe Cofee" stay separate. First name seen wins as the display
+  name; contact fields are only filled when blank, so a later lead never
+  silently swaps the representative.
+- Legacy leads are backfilled lazily by `backfillCompanies()` on first read of
+  `/api/leads` or `/api/admin/companies`. It is idempotent.
+- **The Companies timeline is synthesised server-side from every store** —
+  leads, notes, `conversations[].messages[]` and `activities[]`. Never build it
+  from `lead.activities[]` alone: that array truncates chat to 50 chars and
+  never held notes or assignment events.
+- Linking a movement to a company is **explicit only** (`PUT
+  /api/admin/payments/ledger/:id { company_id }`, validated 400 on a bad id).
+  The companies API still returns an *inferred* rollup by `counterparty_name`
+  in `inferred_payment_ids` for reference only — it is never written back.
+- Renaming a company onto an existing one returns **409** — merging is a
+  deliberate separate operation, never a side effect of an edit.
+- Access: Companies = `bd_executive` (own leads) + `manager`/`bdm`/`ops_manager`/
+  `super_admin`. Accounts = `PAYOUT_ROLES` (manager/bdm/ops_manager/super_admin).
+  Do **not** use the level-based `requireManager` for either — it would admit
+  `recee_manager`/`ops_executive`, which the APIs reject. The AdminPanel/Sidebar
+  gates mirror these lists exactly.
 
 ## Google Sheet sync (the heart — services/sheetSync.js)
 

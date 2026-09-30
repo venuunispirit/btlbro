@@ -46,11 +46,11 @@ const CustomerForm = () => {
       read: false,
       submittedAt: new Date().toISOString(),
     };
-    // Save to the server DB (only place it is stored)
-    fetch('/api/orders', {
+    // Save to the server DB as a lead
+    fetch('/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newOrder),
+      body: JSON.stringify({ ...newOrder, source: 'customize' }),
     }).catch(() => { /* server offline — request could not be saved */ });
     setSubmitted(true);
   }

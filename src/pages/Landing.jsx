@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import {
   ArrowRight, ArrowUpRight, MapPin, Users, Target, Radio,
   Wallet, Quote, Linkedin, Instagram, Facebook, Youtube,
@@ -7,6 +7,8 @@ import {
 import OrbitHero from "../components/OrbitHero.jsx";
 import Footer from "../components/Footer.jsx";
 import IntroScreen from "../components/IntroScreen.jsx";
+import CampaignModal from "../components/CampaignModal.jsx";
+import { isCompleteCampaign } from "../utils/campaignMath.js";
 import MarketingTool from "./MarketingTool.jsx";
 
 /* ============================================================
@@ -273,6 +275,132 @@ function TrustStrip({ cms }) {
           {[...logos, ...logos].map((l, i) => (
             <span key={i} className="trust-marquee-item">{l}</span>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}/* Campaign card carousel — ONE horizontal line (flex-wrap: nowrap), driven by
+   the admin Marquee section. Every `speedSeconds` the track slides smoothly so
+   the next card reaches the highlighted center position (zoom + orange border
+   + glow). Clones of the last/first card at the track edges make the infinite
+   loop seamless: after sliding onto the end-clone (which looks like Card 1) we
+   snap back to the real Card 1 with the transition disabled — invisible. */
+const CAROUSEL_SLIDE_MS = 600;
+
+function CampaignMarquee({ campaigns, speedSeconds = 5, onOpenCard }) {
+  const items = Array.isArray(campaigns) ? campaigns : [];
+  const total = items.length;
+  const perCardMs = Math.max(1, parseInt(speedSeconds, 10) || 5) * 1000;
+
+  // pos = index of the track child currently centered/highlighted.
+  // The track holds `repeat` copies of the card list (measured against the
+  // viewport) so the viewport NEVER sees past the track ends — after the
+  // last card, the first card follows seamlessly, forever.
+  const [pos, setPos] = useState(null);
+  const [instant, setInstant] = useState(false); // true while snapping back invisibly
+  const [step, setStep] = useState(0); // card width incl. right margin
+  const [viewportW, setViewportW] = useState(0);
+  const viewportRef = useRef(null);
+  const cardRefs = useRef([]);
+
+  // Measure the first real card (width + horizontal margin) and the viewport.
+  useLayoutEffect(() => {
+    const card = cardRefs.current[0];
+    const vp = viewportRef.current;
+    if (!card || !vp) return undefined;
+    const measure = () => {
+      const cs = window.getComputedStyle(card);
+      setStep(card.offsetWidth + parseFloat(cs.marginLeft || 0) + parseFloat(cs.marginRight || 0));
+      setViewportW(vp.offsetWidth);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(card);
+    ro.observe(vp);
+    return () => ro.disconnect();
+  }, [total]);
+
+  // Anchor pos once we know how many cards we have; re-anchor if the
+  // campaign list size changes (admin saved edits).
+  useEffect(() => {
+    setPos((p) => (p === null || p >= total * 2 ? total : p));
+  }, [total]);
+
+  useEffect(() => {
+    if (total <= 1) return undefined;
+    const timer = setInterval(() => {
+      setPos((p) => (p === null ? p : p + 1));
+    }, perCardMs);
+    return () => clearInterval(timer);
+  }, [total, perCardMs]);
+
+  // After sliding into the third copy (visually identical to the second),
+  // snap back one copy-width with transitions disabled — invisible.
+  useEffect(() => {
+    if (pos === null || pos < total * 2) return undefined;
+    const t = setTimeout(() => {
+      setInstant(true);
+      setPos((p) => p - total);
+    }, CAROUSEL_SLIDE_MS + 60);
+    return () => clearTimeout(t);
+  }, [pos, total]);
+
+  useEffect(() => {
+    if (!instant) return undefined;
+    const r = requestAnimationFrame(() => setInstant(false));
+    return () => cancelAnimationFrame(r);
+  }, [instant]);
+
+  if (total === 0) return null;
+
+  // Repeat the list enough times that (viewport + buffer) is always covered:
+  // cards needed ≈ viewport/step + 4 → copies = that / total, min 3.
+  const repeat = Math.max(3, Math.ceil((viewportW / Math.max(1, step) + 4) / Math.max(1, total)));
+  const trackItems = [];
+  for (let r = 0; r < repeat; r++) {
+    for (let i = 0; i < total; i++) trackItems.push(items[i]);
+  }
+  const activePos = pos === null ? total : pos;
+  const offset = Math.max(0, activePos * step - Math.max(0, (viewportW - step) / 2));
+
+  return (
+    <section className="campaign-marquee" aria-label="Campaign highlights">
+      <div className="carousel-viewport" ref={viewportRef}>
+        <div
+          className="carousel-track"
+          style={{ transform: `translate3d(${-offset}px, 0, 0)`, transition: instant ? "none" : undefined }}
+        >
+          {trackItems.map((c, i) => {
+            const realIndex = i % total;
+            return (
+              <article
+                className={`carousel-card${i === activePos ? " is-active" : ""}${onOpenCard ? " is-clickable" : ""}`}
+                key={i}
+                ref={(el) => { cardRefs.current[i] = el; }}
+                {...(onOpenCard ? {
+                  role: "button",
+                  tabIndex: 0,
+                  "aria-label": `Open campaign details: ${c.title || "Untitled"}`,
+                  onClick: () => onOpenCard(c),
+                  onKeyDown: (e) => {
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenCard(c); }
+                  },
+                } : {})}
+              >
+                {onOpenCard && <span className="campaign-card-open-hint" aria-hidden="true">View details →</span>}
+                {c.image ? (
+                  <img src={c.image} alt={c.title || "Campaign"} loading="lazy" />
+                ) : (
+                  <div className="campaign-card-fallback" aria-hidden="true">{String(realIndex + 1).padStart(2, "0")}</div>
+                )}
+                <div className="campaign-card-shade" />
+                <div className="campaign-card-text">
+                  <h4>{c.title || ""}</h4>
+                  {c.desc ? <p>{c.desc}</p> : null}
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -711,6 +839,23 @@ export default function BTLbroLanding({ activeTab: activeTabProp, setActiveTab: 
   const activeTab = activeTabProp ?? activeTabLocal;
   const setActiveTab = setActiveTabProp ?? setActiveTabLocal;
   const cms = useContent();
+  const [openCampaign, setOpenCampaign] = useState(null);
+
+  /* Open the popup INSTANTLY with the card's data, then re-fetch the CMS in
+     the background so admin edits show up immediately. Even if the fetch
+     fails or hangs, the popup always opens (never blocked on the network). */
+  const handleOpenCampaign = useCallback((cardItem) => {
+    setOpenCampaign(cardItem);
+    fetch("/api/content")
+      .then((r) => r.json())
+      .then((d) => {
+        const fresh = d.content?.marquee?.items;
+        if (!Array.isArray(fresh)) return;
+        const idx = fresh.findIndex((it) => it.title === cardItem.title && it.image === cardItem.image);
+        if (idx >= 0) setOpenCampaign(fresh[idx]);
+      })
+      .catch(() => { /* keep the already-loaded copy */ });
+  }, []);
 
   const handleIntroComplete = useCallback(() => {
     sessionStorage.setItem('btl_intro_played', '1');
@@ -729,6 +874,11 @@ export default function BTLbroLanding({ activeTab: activeTabProp, setActiveTab: 
               <TrustStrip cms={cms} />
             </div>
             <main>
+              <CampaignMarquee
+                campaigns={((cms.marquee && Array.isArray(cms.marquee.items) ? cms.marquee.items : null) || []).filter(isCompleteCampaign)}
+                speedSeconds={cms.marquee?.speed_seconds || 5}
+                onOpenCard={handleOpenCampaign}
+              />
               <GrowthLine cms={cms} />
               <Pillars cms={cms} />
               <Capabilities cms={cms} />
@@ -747,6 +897,7 @@ export default function BTLbroLanding({ activeTab: activeTabProp, setActiveTab: 
               <FinalCTA cms={cms} />
             </main>
             <Footer />
+            <CampaignModal campaign={openCampaign} onClose={() => setOpenCampaign(null)} />
           </>
         ) : (
           <MarketingTool />
@@ -853,6 +1004,7 @@ const CSS = `
 .top .hero-ctas { display: flex; align-items: center; gap: 26px; margin-top: 26px; flex-wrap: wrap; }
 .top .hero-text-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14.5px; color: var(--tink); }
 .top .hero-text-link:hover { color: var(--torange); }
+
 .top .hero-features { display: flex; align-items: flex-start; gap: 20px; margin-top: 48px; flex-wrap: wrap; }
 .top .hero-feature { display: flex; align-items: flex-start; gap: 10px; max-width: 150px; }
 .top .hero-feature-title { font-size: 13.5px; font-weight: 700; color: var(--tink); }
@@ -881,6 +1033,29 @@ const CSS = `
 .top .stat-label { font-size: 11px; color: var(--tsec); margin-top: 4px; }
 @media (max-width: 1100px) { .top .stat-card { position: static; transform: none; width: auto; margin-top: 16px; flex-direction: row; justify-content: space-between; } }
 @media (max-width: 640px) { .top .stat-card { flex-direction: column; } }
+
+/* ---------- Campaign card carousel (one line, sliding, infinite) ---------- */
+.btlbro-root section.campaign-marquee { padding-top: 8px; padding-bottom: 8px; }
+.carousel-viewport { overflow: hidden; width: 100%; padding: 18px 0 22px; }
+.carousel-track { display: flex; flex-wrap: nowrap; align-items: center; will-change: transform; transition: transform 600ms cubic-bezier(.33,.1,.2,1); }
+.carousel-card { position: relative; flex: 0 0 auto; width: 320px; height: 205px; margin-right: 18px; border-radius: 10px; overflow: hidden; background: #F0EDE9; border: 2px solid transparent; transform: scale(1); transform-origin: center; transition: transform 600ms cubic-bezier(.33,.1,.2,1), box-shadow 600ms ease, border-color 600ms ease; z-index: 1; }
+.carousel-card img { width: 100%; height: 100%; object-fit: cover; display: block; transition: filter 600ms ease; }
+.campaign-card-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: 'Zilla Slab', serif; font-size: 44px; font-weight: 700; color: #C9C4BE; background: linear-gradient(135deg, #F5F2EE, #EAE5DF); }
+.campaign-card-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(0,0,0,.72) 100%); transition: background 600ms ease; pointer-events: none; }
+.campaign-card-text { position: absolute; left: 16px; right: 16px; bottom: 13px; color: #fff; }
+/* Explicit white: the global .btlbro-root h4 { color: var(--ink) } rule would
+   otherwise win and render dark titles on the dark image shade */
+.campaign-card-text h4 { margin: 0; font-family: 'Zilla Slab', serif; font-size: 18px; font-weight: 700; line-height: 1.2; color: #fff; }
+.campaign-card-text p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,.78); white-space: pre-line; max-height: 0; opacity: 0; overflow: hidden; transition: max-height 600ms ease, opacity 600ms ease; }
+.carousel-card.is-active { transform: scale(1.10); border-color: #FF7A00; box-shadow: 0 0 0 4px rgba(255,122,0,.16), 0 14px 44px rgba(255,122,0,.30); z-index: 5; }
+.carousel-card.is-active img { filter: brightness(1.08); }
+.carousel-card.is-active .campaign-card-shade { background: linear-gradient(180deg, rgba(0,0,0,.05) 30%, rgba(0,0,0,.85) 100%); }
+.carousel-card.is-active .campaign-card-text p { max-height: 60px; opacity: 1; }
+.carousel-card:hover:not(.is-active) { transform: scale(1.02); z-index: 2; }
+@media (max-width: 1440px) { .carousel-card { width: 280px; height: 185px; } }
+@media (max-width: 1200px) { .carousel-card { width: 250px; height: 170px; } }
+@media (max-width: 640px) { .carousel-card { width: 240px; height: 160px; } .campaign-card-text h4 { font-size: 15px; } .campaign-card-text p { display: none; } }
+@media (prefers-reduced-motion: reduce) { .carousel-track, .carousel-card { transition: none; } .carousel-card.is-active { transform: none; } }
 
 .top .trust { background: var(--bg); padding: 38px 0 32px; text-align: center; overflow: hidden; }
 @media (max-width: 640px) { .top .trust { padding: 28px 0 24px; } }
@@ -1055,4 +1230,130 @@ const CSS = `
 .final-cta-chain { display: flex; flex-direction: column; gap: 6px; }
 .final-stage { display: inline-block; padding: 10px 20px; border: 1px solid rgba(255,255,255,.3); border-radius: 4px; font-family: var(--font-display); font-weight: 800; font-size: 15px; color: #fff; text-align: center; }
 .final-stage-last { background: #fff; color: var(--orange); border-color: #fff; }
+
+/* ---------------- Campaign popup — glassmorphism (uploaded image bg, left info, right graph) ---------------- */
+.carousel-card.is-clickable { cursor: pointer; }
+.campaign-card-open-hint { position: absolute; top: 8px; right: 8px; z-index: 3; background: rgba(17,17,17,.55); color: #fff; backdrop-filter: blur(4px); font-size: 10px; font-weight: 600; letter-spacing: .04em; padding: 4px 9px; border-radius: 999px; opacity: 0; transform: translateY(-4px); transition: opacity .25s ease, transform .25s ease; pointer-events: none; }
+.carousel-card.is-clickable:hover .campaign-card-open-hint, .carousel-card.is-clickable:focus-visible .campaign-card-open-hint { opacity: 1; transform: translateY(0); }
+.carousel-card.is-clickable:focus-visible { outline: 3px solid #FF7A00; outline-offset: 2px; }
+
+.cmod-backdrop { position: fixed; inset: 0; z-index: 9999; background: rgba(9,12,20,.6); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); display: flex; align-items: center; justify-content: center; padding: 24px; animation: cmodFade .22s ease; }
+@keyframes cmodFade { from { opacity: 0; } to { opacity: 1; } }
+/* Dialog: the UPLOADED campaign image is the background (single image source) */
+.cmod-dialog { position: relative; width: min(1120px, 96vw); height: min(680px, 92vh); border-radius: 24px; overflow: hidden; background-size: cover; background-position: center; background-color: #101623; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 34px 90px rgba(2,6,18,.5); animation: cmodRise .28s cubic-bezier(.2,.8,.3,1); display: flex; flex-direction: column; }
+.cmod-dialog.cmod-nobg { background: linear-gradient(135deg, #1B2637 0%, #0D1420 100%); }
+@keyframes cmodRise { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .cmod-backdrop, .cmod-dialog, .cmod-ins, .cmod-ins-backdrop { animation: none !important; } }
+/* Translucent overlay: dark under the info column, light wash under the graph panel */
+.cmod-bg-overlay { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(90deg, rgba(10,14,24,.8) 0%, rgba(10,14,24,.62) 34%, rgba(240,243,248,.42) 62%, rgba(240,243,248,.52) 100%); }
+.cmod-backdrop .cmod-close { position: absolute; top: 16px; right: 16px; z-index: 30; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,.4); background: rgba(15,20,32,.5); color: #fff; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .18s ease, transform .25s ease; }
+.cmod-close:hover { background: rgba(15,20,32,.82); transform: rotate(90deg); }
+.cmod-close:focus-visible { outline: 3px solid #FF7A00; outline-offset: 2px; }
+
+/* Layout: LEFT info column over the image | RIGHT translucent graph panel */
+.cmod-main { position: relative; z-index: 2; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(300px, 4fr) 6fr; }
+.cmod-left { min-width: 0; padding: 24px 20px 20px 26px; display: flex; flex-direction: column; gap: 9px; overflow-y: auto; }
+.cmod-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cmod-backdrop .cmod-title { margin: 0; font-size: 25px; font-weight: 800; letter-spacing: -0.02em; color: #fff; line-height: 1.12; text-shadow: 0 2px 14px rgba(0,0,0,.5); }
+/* Every heading/paragraph inside the popup is white — beats the global ink rules */
+.cmod-backdrop h1, .cmod-backdrop h2, .cmod-backdrop h3, .cmod-backdrop h4, .cmod-backdrop h5, .cmod-backdrop h6 { color: #fff; }
+.cmod-backdrop p { color: rgba(255,255,255,.92); }
+.cmod-backdrop .cmod-desc { margin: 0; font-size: 12.5px; color: rgba(255,255,255,.92); line-height: 1.5; text-shadow: 0 1px 8px rgba(0,0,0,.45); white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cmod-badge { padding: 5px 14px; border-radius: 999px; font-size: 11.5px; font-weight: 800; letter-spacing: .06em; color: #fff; box-shadow: 0 4px 14px rgba(2,6,18,.25); }
+.cmod-badge-btl { background: linear-gradient(135deg, #F97316, #EA6A0A); }
+.cmod-badge-ttl { background: linear-gradient(135deg, #3B82F6, #2563EB); }
+.cmod-badge-atl { background: linear-gradient(135deg, #10B981, #0B915F); }
+.cmod-badge-gamified { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
+.cmod-sec-label { display: flex; align-items: center; gap: 7px; margin-top: 5px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,.5); }
+.cmod-sec-label svg { color: #FFB067; flex-shrink: 0; }
+
+/* Glass metric cards — 4 compact cards in a row */
+.cmod-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cmod-metric { background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.24); border-radius: 13px; padding: 9px 10px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 6px 18px rgba(2,6,18,.18); min-width: 0; }
+.cmod-metric-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.78); line-height: 1.4; }
+.cmod-metric-value { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; color: #fff; line-height: 1.3; margin-top: 3px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cmod-metric-blue { background: rgba(37,99,235,.32); border-color: rgba(130,170,250,.5); }
+.cmod-metric-blue .cmod-metric-value { color: #C4D7FF; }
+.cmod-metric-orange { background: rgba(249,115,22,.34); border-color: rgba(250,175,110,.55); }
+.cmod-metric-orange .cmod-metric-value { color: #FFDDBF; }
+
+/* HR utilisation */
+.cmod-hr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cmod-pill { background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.24); border-radius: 999px; padding: 7px 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); min-width: 0; text-align: center; }
+.cmod-pill-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmod-pill-value { font-size: 14.5px; font-weight: 800; color: #fff; margin-top: 1px; }
+.cmod-pill-accent { background: rgba(249,115,22,.88); border-color: rgba(255,195,135,.65); }
+.cmod-pill-accent .cmod-pill-label { color: rgba(255,255,255,.92); }
+.cmod-pill-accent .cmod-pill-value { color: #fff; }
+
+/* RIGHT — large translucent graph panel */
+.cmod-right { min-width: 0; margin: 18px 18px 18px 4px; border-radius: 18px; background: rgba(255,255,255,.66); border: 1px solid rgba(255,255,255,.75); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 36px rgba(2,6,18,.18); padding: 13px 16px 15px; display: flex; flex-direction: column; min-height: 0; }
+/* Start Date | End Date chips — straight from the campaign's own dates */
+.cmod-range { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 6px; padding-right: 42px; }
+.cmod-range-chip { display: inline-flex; flex-direction: column; gap: 1px; background: #fff; border: 1px solid #E5E9F2; border-radius: 10px; padding: 4px 12px; box-shadow: 0 2px 8px rgba(15,23,42,.07); }
+.cmod-range-chip-label { font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #94A3B8; }
+.cmod-range-chip-value { font-size: 12.5px; font-weight: 800; color: #172033; white-space: nowrap; }
+.cmod-range-arrow { color: #F97316; font-weight: 800; font-size: 16px; }
+.cmod-range-spacer { flex: 1; }
+.cmod-legend { display: flex; gap: 12px; font-size: 11px; font-weight: 700; color: #475569; }
+.cmod-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.cmod-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+
+/* Chart */
+.cmod-chart { position: relative; flex: 1; min-height: 0; }
+.cmod-chart svg { display: block; }
+.cmod-chart-empty { border: 1.5px dashed #D7DEE9; border-radius: 12px; height: 100%; min-height: 150px; display: flex; align-items: center; justify-content: center; text-align: center; color: #94A3B8; font-size: 12.5px; padding: 16px; box-sizing: border-box; }
+.cmod-tooltip { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,.94); color: #fff; border-radius: 9px; padding: 7px 12px; font-size: 11.5px; line-height: 1.55; box-shadow: 0 8px 22px rgba(15,23,42,.25); z-index: 4; white-space: nowrap; pointer-events: none; }
+.cmod-tooltip-date { font-weight: 700; margin-bottom: 2px; }
+.cmod-tooltip-row { display: flex; align-items: center; gap: 6px; }
+
+/* Orange "Campaign Insights" pill — bottom-right under the graph */
+.cmod-backdrop .cmod-btn-insights { align-self: flex-end; display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; background: linear-gradient(135deg, #F97316, #EA6A0A); color: #fff; border: none; border-radius: 999px; padding: 12px 26px; font-size: 14px; font-weight: 800; letter-spacing: .02em; cursor: pointer; box-shadow: 0 8px 22px rgba(249,115,22,.42); transition: transform .18s ease, box-shadow .18s ease, filter .18s ease; }
+.cmod-btn-insights:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(249,115,22,.55); filter: brightness(1.06); }
+.cmod-btn-insights:active { transform: translateY(0); }
+.cmod-btn-insights:focus-visible { outline: 3px solid rgba(249,115,22,.45); outline-offset: 2px; }
+
+/* ===== Insights popup — SECOND modal opened on top of the first ===== */
+.cmod-ins-backdrop { position: absolute; inset: 0; z-index: 40; background: rgba(9,12,20,.52); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 22px; animation: cmodFade .2s ease; }
+.cmod-ins { position: relative; width: min(560px, 100%); max-height: 100%; border-radius: 20px; overflow: hidden; background-size: cover; background-position: center; background-color: #101623; border: 1px solid rgba(255,255,255,.22); box-shadow: 0 30px 70px rgba(2,6,18,.55); animation: cmodRise .25s cubic-bezier(.2,.8,.3,1); display: flex; }
+.cmod-ins.cmod-nobg { background: linear-gradient(135deg, #1B2637 0%, #0D1420 100%); }
+.cmod-ins-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,14,24,.8), rgba(10,14,24,.88)); }
+.cmod-ins-backdrop .cmod-ins-close { position: absolute; top: 14px; right: 14px; z-index: 5; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,.35); background: rgba(15,20,32,.55); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease; }
+.cmod-ins-close:hover { background: rgba(15,20,32,.85); }
+.cmod-ins-close:focus-visible { outline: 3px solid #FF7A00; outline-offset: 2px; }
+.cmod-ins-body { position: relative; z-index: 2; flex: 1; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; }
+.cmod-backdrop .cmod-ins-title { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: #fff; }
+.cmod-ins-period { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.85); }
+.cmod-ins-period svg { color: #FFB067; }
+.cmod-ins-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.cmod-ins-chip { background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.24); border-radius: 14px; padding: 11px 8px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); text-align: center; }
+.cmod-ins-chip-value { font-size: 19px; font-weight: 800; color: #fff; }
+.cmod-ins-chip-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.72); margin-top: 2px; }
+.cmod-ins-sec { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .09em; color: #FFB067; margin-top: 2px; }
+.cmod-ins-cmp { display: flex; flex-direction: column; gap: 10px; }
+.cmod-ins-row { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); border-radius: 13px; padding: 11px 14px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.cmod-ins-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.9); }
+.cmod-ins-row-head b { font-size: 15px; color: #fff; }
+.cmod-ins-bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,.18); overflow: hidden; margin-top: 7px; }
+.cmod-ins-bar-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
+.cmod-ins-vals { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; font-size: 11.5px; color: rgba(255,255,255,.75); }
+.cmod-ins-vals b { color: #fff; font-weight: 700; }
+.cmod-ins-backdrop .cmod-ins-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; margin-top: 4px; background: linear-gradient(135deg, #F97316, #EA6A0A); color: #fff; border: none; border-radius: 999px; padding: 11px 22px; font-size: 13.5px; font-weight: 800; cursor: pointer; box-shadow: 0 8px 22px rgba(249,115,22,.4); transition: transform .18s ease, box-shadow .18s ease; }
+.cmod-ins-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(249,115,22,.52); }
+.cmod-ins-btn:focus-visible { outline: 3px solid rgba(249,115,22,.45); outline-offset: 2px; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .cmod-backdrop { padding: 10px; }
+  .cmod-dialog { border-radius: 18px; height: auto; }
+  .cmod-bg-overlay { background: linear-gradient(180deg, rgba(10,14,24,.82), rgba(10,14,24,.9)); }
+  .cmod-title { font-size: 21px; }
+  .cmod-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .cmod-hr-grid { grid-template-columns: 1fr; gap: 7px; }
+  .cmod-pill { border-radius: 13px; }
+  .cmod-ins-chips { gap: 7px; }
+  .cmod-ins-chip-value { font-size: 16px; }
+  .cmod-btn-insights { align-self: stretch; justify-content: center; }
+  .cmod-tooltip { position: static; transform: none; margin-top: 8px; white-space: normal; }
+}
 `;

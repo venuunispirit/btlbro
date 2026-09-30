@@ -88,13 +88,12 @@ const CATCHMENT_STYLE = {
   'Vehicle Branding': { shape: 'triangle', color: '#57534E' },
 };
 
-// Build the SVG string for a catchment marker shape. `onRequest` renders the
-// same shape hollow (outline only) to signal "not in our network yet".
-// First arg is the label; second is the fill color (from CATCHMENT_STYLE).
-function markerSvg(label, onRequest) {
+// Build the SVG string for a catchment marker shape. All places render the
+// same — Google-sourced ones simply get priced/backfilled from the sheet later.
+function markerSvg(label) {
   const st = CATCHMENT_STYLE[label] || { shape: 'circle', color: '#6B7280' };
-  const color = onRequest ? '#B0A89B' : st.color;
-  const fill = onRequest ? 'none' : color;
+  const color = st.color;
+  const fill = color;
   const stroke = color;
   const attrs = `fill="${fill}" stroke="${stroke}" stroke-width="2"`;
   const p = (pts) => pts.map(([x, y]) => `${12 + x},${12 + y}`).join(' ');
@@ -133,8 +132,7 @@ function legendItems(pois) {
   const seen = {};
   pois.forEach((p) => {
     const label = categoryMetaForType(p.type).label;
-    if (!seen[label]) seen[label] = { label, hasOnRequest: p.onRequest === true };
-    if (p.onRequest === true) seen[label].hasOnRequest = true;
+    if (!seen[label]) seen[label] = { label };
   });
   return Object.values(seen);
 }
@@ -382,7 +380,7 @@ export default function MarketingTool() {
   // "sees everything around them" even for catchments we have no sheet data for.
   async function loadNearby(lat, lng) {
     try {
-      const res = await fetch(`/api/places/nearby?lat=${lat}&lng=${lng}&radius=8000&types=${NEARBY_TYPES.join(',')}`);
+      const res = await fetch(`/api/places/nearby?lat=${lat}&lng=${lng}&radius=${radius * 1000}&types=${NEARBY_TYPES.join(',')}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setApiError(false);
@@ -494,15 +492,19 @@ export default function MarketingTool() {
   const serviceColumns = useMemo(() => {
     const cols = [];
     const seen = new Set();
-    // Build a set of matching poi ids for selected categories
-    const matchingTypes = new Set();
-    pois.forEach((poi) => {
-      const matches = selectedCategories.some((catId) => {
+    // Does a type belong to any selected catchment chip?
+    const typeMatchesSelection = (type) =>
+      selectedCategories.some((catId) => {
         const category = dynamicCategories.find((c) => c.id === catId) || categories.find((c) => c.id === catId);
-        return poiMatchesCategory(poi.type, category);
+        return poiMatchesCategory(type, category);
       });
-      if (matches) matchingTypes.add(poi.type);
-    });
+    // Matching types from visible POIs AND from the sheet — so a catchment with
+    // no sheet rows within the radius still shows its OWN services only, and
+    // never leaks columns from another catchment (e.g. cafe services in Apartments).
+    const matchingTypes = new Set([
+      ...pois.filter((p) => typeMatchesSelection(p.type)).map((p) => p.type),
+      ...rawRecords.filter((r) => typeMatchesSelection(r.type)).map((r) => r.type),
+    ]);
     // Collect service columns only from records of the matching types
     rawRecords.forEach((r) => {
       if (!matchingTypes.has(r.type)) return;
@@ -511,15 +513,6 @@ export default function MarketingTool() {
         if (key && !seen.has(key)) { seen.add(key); cols.push(key); }
       });
     });
-    // Fallback: if nothing matched, show all columns
-    if (cols.length === 0) {
-      rawRecords.forEach((r) => {
-        Object.keys(r.services || {}).forEach((k) => {
-          const key = String(k).toLowerCase().trim();
-          if (key && !seen.has(key)) { seen.add(key); cols.push(key); }
-        });
-      });
-    }
     return cols;
   }, [rawRecords, selectedCategories, pois, dynamicCategories]);
 
@@ -769,19 +762,19 @@ export default function MarketingTool() {
           });
         });
 
-    // POI markers — one geometric shape per catchment, hollow for on-request
+    // POI markers — one geometric shape per catchment. Every place renders the
+    // same; source (inhouse / from google) is tracked in the sheet, not the UI.
     filteredPois.forEach((poi) => {
-      const onRequest = poi.onRequest === true;
-      const svg = markerSvg(categoryMetaForType(poi.type).label, onRequest);
+      const svg = markerSvg(categoryMetaForType(poi.type).label);
       const poiIcon = L.divIcon({
         className: "mt-poi-marker",
-        html: '<div class="mt-poi-shape"' + (onRequest ? ' style="opacity:.85"' : '') + ' title="' + (poi.name || '') + '">' + svg + '</div>',
+        html: '<div class="mt-poi-shape" title="' + (poi.name || '') + '">' + svg + '</div>',
         iconSize: [22, 22],
         iconAnchor: [11, 11],
       });
       const poiMarker = L.marker([poi.lat, poi.lng], { icon: poiIcon }).addTo(map);
       poiMarker.bindPopup(
-        '<div class="mt-poi-popup"><strong>' + (poi.name || poi.fullName) + '</strong><span>' + poi.type + (onRequest ? ' · On Request' : '') + '</span></div>'
+        '<div class="mt-poi-popup"><strong>' + (poi.name || poi.fullName) + '</strong><span>' + poi.type + '</span></div>'
       );
       markersRef.current.push(poiMarker);
     });
@@ -802,7 +795,7 @@ export default function MarketingTool() {
           {/* API server unreachable — autocomplete/nearby can't work */}
           {apiError && (
             <div className="mt-api-error">
-              ⚠ Can't reach the BTLbro API (localhost:3001). Autocomplete and live map data are off — start the server (`cd server && npm run dev`) and refresh.
+              ⚠ Can't reach the BTLbro API (localhost:8081). Autocomplete and live map data are off — start the server (`cd server && npm run dev`) and refresh.
             </div>
           )}
           {/* Header */}
@@ -978,7 +971,7 @@ export default function MarketingTool() {
                           <div key={it.label} className="mt-legend-item">
                             <span
                               className="mt-legend-swatch"
-                              dangerouslySetInnerHTML={{ __html: markerSvg(it.label, it.hasOnRequest) }}
+                              dangerouslySetInnerHTML={{ __html: markerSvg(it.label) }}
                             />
                             <span className="mt-legend-label">{it.label}</span>
                           </div>
@@ -1083,7 +1076,6 @@ export default function MarketingTool() {
                             {filtered.map((poi, idx) => {
                               const isSelected = hasAnyPromotion(poi.id);
                               const onRequest = poi.onRequest === true;
-                              const isGoogle = poi.source === 'from google';
                               return (
                               <tr
                                 key={poi.id}
@@ -1098,8 +1090,6 @@ export default function MarketingTool() {
                                 </td>
                                 <td className="mt-td-name" title={poi.name}>
                                   {poi.name}
-                                  {isGoogle && <span className="mt-src-badge mt-src-google">From Google</span>}
-                                  {onRequest && <span className="mt-onrequest-badge">On Request</span>}
                                 </td>
                                 <td><span className="mt-td-type">{getCategoryLabel(poi.type)}</span></td>
                                 <td className="mt-td-dist">
@@ -1115,9 +1105,9 @@ export default function MarketingTool() {
                                   return (
                                     <td key={svc} className="mt-td-promo">
                                       {onRequest ? (
-                                        // Google place, no sheet price yet — selectable as
-                                        // "from google"; the agency prices it from the backfilled sheet row
-                                        <label className="mt-svc-pick" title="Not priced yet — request handled manually">
+                                        // Google place, no sheet price yet — selectable; the
+                                        // source is tracked in the sheet, never shown to the user
+                                        <label className="mt-svc-pick" title="Select service">
                                           <input
                                             type="checkbox"
                                             className="mt-svc-checkbox"
@@ -1898,35 +1888,9 @@ const CSS = `
 .mt-tr-clickable:hover { background: #FBF8F4; }
 .mt-tr-active.mt-tr-clickable:hover { background: #FFE8D6; }
 
-/* Google Places row we don't have in our network — shown as info, not bookable */
+/* Google Places row we don't have in our network — renders like any other row */
 .mt-tr-onrequest { background: #F7F7F5; opacity: 0.85; cursor: default; }
 .mt-tr-onrequest:hover { background: #F0EFEC; }
-.mt-src-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
-.mt-src-google { background: #FEF3C7; color: #B45309; }
-.mt-src-inhouse { background: #DCFCE7; color: #15803D; }
-.mt-onrequest-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: #E7E2D8;
-  color: #656565;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
 
 /* Row number / checkmark indicator */
 .mt-row-check {

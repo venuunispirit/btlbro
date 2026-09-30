@@ -32,6 +32,31 @@ function toNum(v) {
 // [{ key: "notice board", label: "Notice Board", price: 3000 }, …]
 // New multi-tab sheets store a `services` map; older sheets keep five flat
 // promo columns — both are normalized here.
+/**
+ * Render a UPI intent as a data-URL QR. Returns "" until the image is ready so
+ * the caller can show a placeholder instead of a broken <img>.
+ */
+function useQrDataUrl(uri) {
+  const [dataUrl, setDataUrl] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    if (!uri) {
+      setDataUrl("");
+      return undefined;
+    }
+    import("qrcode")
+      .then((mod) => (mod.default || mod).toDataURL(uri, { width: 320, margin: 2 }))
+      .then((url) => {
+        if (!cancelled) setDataUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setDataUrl("");
+      });
+    return () => { cancelled = true; };
+  }, [uri]);
+  return dataUrl;
+}
+
 function servicesOf(loc) {
   const out = [];
   if (loc && loc.services && typeof loc.services === "object") {
@@ -70,7 +95,8 @@ const QuickCheckout = () => {
   // findDriveRecord retained for name-based fallback lookups (not pricing)
 
   // Admin pricing settings from the server DB
-  const [settings, setSettings] = useState({ per_location_price: 0, agency_fee: 10 });
+  const [settings, setSettings] = useState({ per_location_price: 0, agency_fee: 10, min_booking: 999 });
+  const [razorpayConfig, setRazorpayConfig] = useState({ enabled: false, key_id: '' });
   useEffect(() => {
     fetch('/api/settings')
       .then((r) => r.json())
@@ -79,9 +105,16 @@ const QuickCheckout = () => {
           setSettings({
             per_location_price: typeof d.settings.per_location_price === 'number' ? d.settings.per_location_price : 0,
             agency_fee: typeof d.settings.agency_fee === 'number' ? d.settings.agency_fee : 10,
+            // Booking amount is admin-controlled (Settings → Payment Gateway).
+            // Server re-derives it when charging, so this only drives the quote.
+            min_booking: typeof d.settings.payment?.min_booking === 'number' ? d.settings.payment.min_booking : 999,
           });
         }
       })
+      .catch(() => {});
+    fetch('/api/payments/config')
+      .then((r) => r.json())
+      .then((d) => { if (d) setRazorpayConfig(d); })
       .catch(() => {});
   }, []);
 
@@ -188,9 +221,24 @@ const QuickCheckout = () => {
     business: "",
   });
   const [paymentMethod, setPaymentMethod] = useState("upi");
-  const [paymentChoice, setPaymentChoice] = useState("booking"); // "booking" = ₹999, "full" = total
   const [duration, setDuration] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  // Live collection request once /api/checkout/pay has answered.
+  const [session, setSession] = useState(null); // { leadId, amount, reference, intentUri, payu, status }
+  const [checkoutError, setCheckoutError] = useState("");
+  const pollTimer = useRef(null);
+  const qrDataUrl = useQrDataUrl(session?.intentUri || "");
+
+  // Load Razorpay checkout script (lightweight, no-op if unused)
+  useEffect(() => {
+    if (!document.getElementById('razorpay-script')) {
+      const script = document.createElement('script');
+      script.id = 'razorpay-script';
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   // When using Drive data with real sheet prices, no extra per-location cost
   // Drive mode: only when user explicitly clicked "Use Latest Drive Data"
@@ -277,8 +325,10 @@ const QuickCheckout = () => {
   const subtotal = locationCost + promoCost + setupFee;
   const gst = Math.round(subtotal * 0.18);
   const total = subtotal + gst;
-  // Flat ₹999 booking/token amount to confirm the campaign
-  const advancePayment = 999;
+  // Flat booking/token amount to confirm the campaign. Admin-controlled via
+  // Settings → Payment Gateway → Booking Amount; falls back to ₹999 if
+  // settings haven't loaded. The server re-derives this when charging.
+  const advancePayment = settings.min_booking > 0 ? settings.min_booking : 999;
 
   function handleChange(e) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -295,52 +345,168 @@ const QuickCheckout = () => {
 
   function handlePay() {
     setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setStep(3);
-      const newOrder = {
-        id: Date.now(),
-        businessName: formData.business,
-        contactName: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        category,
-        locations: locationCount.toString(),
-        radius: "5",
-        pincode: pincode || "N/A",
-        zone: "",
-        duration: `${duration} month${duration > 1 ? 's' : ''}`,
-        startDate: "",
-        message: "",
-        budget: "",
-        selectedLocations: checkoutData.map((loc) => {
-          const locId = loc.id || loc.name;
-          const selections = locPromoSelections[locId] || {};
-          // Selected services with REAL sheet prices (label → price per month)
-          const selectedPromos = {};
-          servicesOf(loc).forEach((svc) => {
-            if (svc.price > 0 && selections[svc.key] !== false) {
-              selectedPromos[svc.label] = svc.price;
-            }
-          });
-          const prices = {};
-          servicesOf(loc).forEach((svc) => { prices[svc.label] = svc.price; });
-          return { name: loc.fullName || loc.name, type: loc.type, lat: loc.lat, lng: loc.lng, promotions: selectedPromos, prices, source: loc.source === 'from google' ? 'from google' : 'inhouse' };
-        }),
-        invoice: { locationCost, promoCost, agencyFee: setupFee, agencyFeePercent, gst, total, perLocation, promoBreakdown },
-        paymentMethod,
-        paymentChoice,
-        amountPaid: paymentChoice === "booking" ? advancePayment : total,
-        status: "paid",
-        submittedAt: new Date().toISOString(),
-      };
-      // Save the order to the server DB (only place it is stored)
-      fetch('/api/orders', {
+
+    const payAmount = advancePayment;   // booking only — the balance is collected later
+
+    // If Razorpay is enabled, open the real Razorpay checkout
+    if (razorpayConfig.enabled && razorpayConfig.key_id) {
+      fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newOrder),
-      }).catch(() => { /* server offline — order could not be saved */ });
-    }, 2000);
+        body: JSON.stringify({ amount: payAmount, currency: 'INR' }),
+      })
+        .then(r => r.json())
+        .then(orderData => {
+          if (orderData.error) throw new Error(orderData.error);
+
+          const rzp = new window.Razorpay({
+            key: razorpayConfig.key_id,
+            amount: orderData.amount,
+            currency: orderData.currency,
+            name: 'BTLbro',
+            description: `Campaign Booking — ₹${payAmount}`,
+            order_id: orderData.order_id,
+            handler: function (response) {
+              // Payment successful — verify and create lead
+              fetch('/api/payments/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(response),
+              })
+                .then(r => r.json())
+                .then(() => finishWithRazorpay(response.razorpay_payment_id))
+                .catch(() => finishWithRazorpay(response.razorpay_payment_id));
+            },
+            prefill: { name: formData.name, email: formData.email, contact: formData.phone },
+            theme: { color: '#F2701D' },
+          });
+          rzp.open();
+          setIsProcessing(false);
+        })
+        .catch(() => {
+          setIsProcessing(false);
+          setCheckoutError("We couldn't start the payment. Please try again.");
+        });
+      return;
+    }
+
+    // UPI rail: one call records the lead AND builds a fixed-amount request.
+    // The server recomputes the amount from admin settings, so the figure we
+    // showed the customer can never disagree with the one actually charged.
+    setCheckoutError("");
+    fetch('/api/checkout/pay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildLeadPayload()),
+    })
+      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!ok) throw new Error(d?.error || 'Payment could not be started');
+        setSession({
+          leadId: d.lead_id,
+          amount: d.amount,
+          reference: d.reference,
+          intentUri: d.intent_uri,
+          payu: d.payu,
+          status: 'awaiting',
+        });
+        if (d.payment_error) {
+          setCheckoutError(d.payment_error);
+        }
+        setIsProcessing(false);
+        if (d.intent_uri) startPolling(d.reference);
+        else setStep(3);
+      })
+      .catch((err) => {
+        setIsProcessing(false);
+        setCheckoutError(err.message || 'Payment could not be started. Please try again.');
+      });
+  }
+
+  // Watch a reference until the gateway (or a manager) confirms it. Polling
+  // stops on success, on failure, and after a hard ceiling so a dead rail
+  // can't leave the customer on a spinner forever.
+  function startPolling(reference) {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    let attempts = 0;
+    pollTimer.current = setInterval(() => {
+      attempts += 1;
+      fetch(`/api/checkout/status/${encodeURIComponent(reference)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.status && d.status !== 'awaiting' && d.status !== 'processing') {
+            if (pollTimer.current) clearInterval(pollTimer.current);
+            setSession((s) => ({ ...s, status: d.status }));
+            if (d.status === 'paid') setStep(3);
+          }
+        })
+        .catch(() => {});
+      if (attempts > 90) {
+        if (pollTimer.current) clearInterval(pollTimer.current);
+      }
+    }, 5000);
+  }
+
+  useEffect(() => () => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+  }, []);
+
+  function buildLeadPayload() {
+    return {
+      businessName: formData.business,
+      contactName: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      category,
+      locations: locationCount.toString(),
+      radius: "5",
+      pincode: pincode || "N/A",
+      zone: "",
+      duration: `${duration} month${duration > 1 ? 's' : ''}`,
+      startDate: "",
+      message: "",
+      budget: "",
+      selectedLocations: checkoutData.map((loc) => {
+        const locId = loc.id || loc.name;
+        const selections = locPromoSelections[locId] || {};
+        const selectedPromos = {};
+        servicesOf(loc).forEach((svc) => {
+          if (svc.price > 0 && selections[svc.key] !== false) {
+            selectedPromos[svc.label] = svc.price;
+          }
+        });
+        const prices = {};
+        servicesOf(loc).forEach((svc) => { prices[svc.label] = svc.price; });
+        return { name: loc.fullName || loc.name, type: loc.type, lat: loc.lat, lng: loc.lng, promotions: selectedPromos, prices, source: loc.source === 'from google' ? 'from google' : 'inhouse' };
+      }),
+      invoice: { locationCost, promoCost, agencyFee: setupFee, agencyFeePercent, gst, total, perLocation, promoBreakdown },
+      // Which services were picked on which location. The server prices these
+      // against the synced sheet, so no money figure from the browser is
+      // trusted — only the selection itself.
+      selections: checkoutData.map((loc) => {
+        const locId = loc.id || loc.name;
+        const sel = locPromoSelections[locId] || {};
+        return {
+          name: loc.fullName || loc.name,
+          type: loc.type,
+          services: servicesOf(loc).filter((svc) => sel[svc.key] === true).map((svc) => svc.key),
+        };
+      }),
+      duration_months: duration,
+      paymentMethod,
+    };
+  }
+
+  // Razorpay path: the lead is still created, tagged with the gateway's id.
+  function finishWithRazorpay(paymentId) {
+    const lead = { ...buildLeadPayload(), amountPaid: advancePayment, razorpay_payment_id: paymentId };
+    fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lead),
+    }).catch(() => {});
+    setIsProcessing(false);
+    setStep(3);
   }
 
   return (
@@ -409,14 +575,17 @@ const QuickCheckout = () => {
                                 <span key={p.key} style={{
                                   padding: "4px 10px",
                                   borderRadius: 6,
-                                  background: "#FFF4EC",
-                                  border: "1px solid #F2701D",
-                                  color: "#F2701D",
+                                  // No price on file yet is normal — the quote
+                                  // is confirmed after the order, not before.
+                                  // Only a priced service gets the accent chip.
+                                  background: p.price > 0 ? "#FFF4EC" : "#F5F3EE",
+                                  border: `1px solid ${p.price > 0 ? "#F2701D" : "#E2DDD2"}`,
+                                  color: p.price > 0 ? "#F2701D" : "#8A8377",
                                   fontSize: 11,
                                   fontWeight: 600,
                                   fontFamily: "'Inter', sans-serif",
                                 }}>
-                                  {p.label}{p.price > 0 ? `: ₹${p.price.toLocaleString()}` : `: -`}
+                                  {p.label}{p.price > 0 ? `: ₹${p.price.toLocaleString()}` : ""}
                                 </span>
                               ))}
                             </div>
@@ -515,40 +684,30 @@ const QuickCheckout = () => {
                 <CreditCard size={28} color="#F2701D" />
                 <div>
                   <h1 style={styles.title}>Payment</h1>
-                  <p style={styles.subtitle}>Pay ₹999 booking fee to confirm your campaign</p>
+                  <p style={styles.subtitle}>Pay ₹{advancePayment.toLocaleString()} booking fee to confirm your campaign</p>
                 </div>
               </div>
 
-              {/* Payment Choice */}
+              {/* Payment amount — booking only.
+                  There is deliberately no "pay in full" option. The booking fee
+                  confirms the slot; the rest of the campaign is requested later
+                  as the work progresses, so the balance is never collected
+                  before anything has been delivered. */}
               <div style={{ marginBottom: 20 }}>
-                <div style={styles.sectionTitle}>Choose Payment Option</div>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <label style={{
-                    display: "flex", alignItems: "center", gap: 14, padding: "16px 18px",
-                    border: paymentChoice === "booking" ? "2px solid #F2701D" : "1.5px solid #E7E2D8",
-                    background: paymentChoice === "booking" ? "#FFF4EC" : "#fff",
-                    borderRadius: 12, cursor: "pointer",
-                  }}>
-                    <input type="radio" name="paymentChoice" value="booking" checked={paymentChoice === "booking"} onChange={() => setPaymentChoice("booking")} style={{ accentColor: "#F2701D" }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#161616" }}>Pay Booking Fee — ₹999</div>
-                      <div style={{ fontSize: 12, color: "#949494", marginTop: 2 }}>Confirm your slot now. Balance ₹{(total - 999).toLocaleString()} due after campaign confirmation.</div>
+                <div style={styles.sectionTitle}>Payment Due Now</div>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 14, padding: "16px 18px",
+                  border: "2px solid #F2701D",
+                  background: "#FFF4EC",
+                  borderRadius: 12,
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "#161616" }}>Booking Fee — ₹{advancePayment.toLocaleString()}</div>
+                    <div style={{ fontSize: 12, color: "#949494", marginTop: 2 }}>
+                      Confirms your slot now. The balance of ₹{Math.max(0, total - advancePayment).toLocaleString()} is requested later, as the campaign progresses.
                     </div>
-                    <span style={{ fontWeight: 800, fontSize: 20, color: "#F2701D" }}>₹999</span>
-                  </label>
-                  <label style={{
-                    display: "flex", alignItems: "center", gap: 14, padding: "16px 18px",
-                    border: paymentChoice === "full" ? "2px solid #161616" : "1.5px solid #E7E2D8",
-                    background: paymentChoice === "full" ? "#F9F9F9" : "#fff",
-                    borderRadius: 12, cursor: "pointer",
-                  }}>
-                    <input type="radio" name="paymentChoice" value="full" checked={paymentChoice === "full"} onChange={() => setPaymentChoice("full")} style={{ accentColor: "#161616" }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#161616" }}>Pay Full Amount — ₹{total.toLocaleString()}</div>
-                      <div style={{ fontSize: 12, color: "#949494", marginTop: 2 }}>Pay the complete campaign amount upfront. No balance due.</div>
-                    </div>
-                    <span style={{ fontWeight: 800, fontSize: 20, color: "#161616" }}>₹{total.toLocaleString()}</span>
-                  </label>
+                  </div>
+                  <span style={{ fontWeight: 800, fontSize: 20, color: "#F2701D" }}>₹{advancePayment.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -630,9 +789,59 @@ const QuickCheckout = () => {
                   <ArrowLeft size={16} /> Back
                 </button>
                 <button onClick={handlePay} disabled={isProcessing} style={{ ...styles.primaryBtn, opacity: isProcessing ? 0.7 : 1, marginTop: 0 }}>
-                  {isProcessing ? "Processing..." : <>Pay ₹{(paymentChoice === "booking" ? advancePayment : total).toLocaleString()} Now <ArrowRight size={16} /></>}
+                  {isProcessing ? "Processing..." : <>Pay ₹{advancePayment.toLocaleString()} Now <ArrowRight size={16} /></>}
                 </button>
               </div>
+
+              {checkoutError && (
+                <div style={{ marginTop: 16, padding: "12px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, fontSize: 13, color: "#B91C1C" }}>
+                  {checkoutError}
+                </div>
+              )}
+
+              {/* Fixed-amount request. The amount is baked into the QR, so the
+                  payer cannot change what they send. */}
+              {session && (
+                <div style={{ marginTop: 20, padding: 18, border: "1px solid #E7E2D8", borderRadius: 14, background: "#FAF9F7", textAlign: "center" }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#161616", marginBottom: 4 }}>
+                    Scan &amp; pay ₹{(session.amount || 0).toLocaleString()}
+                  </p>
+                  <p style={{ fontSize: 11, color: "#949494", marginBottom: 14 }}>
+                    {session.status === "paid"
+                      ? "Payment received"
+                      : session.status === "awaiting"
+                        ? "Waiting for payment — this page updates automatically"
+                        : `Payment ${session.status}`}
+                  </p>
+
+                  {qrDataUrl ? (
+                    <img src={qrDataUrl} alt={`UPI QR for ₹${session.amount}`} style={{ width: 240, height: 240, background: "#fff", borderRadius: 10, border: "1px solid #E7E2D8" }} />
+                  ) : (
+                    <div style={{ width: 240, height: 240, margin: "0 auto", borderRadius: 10, background: "#fff", border: "1px solid #E7E2D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#949494" }}>
+                      Preparing QR…
+                    </div>
+                  )}
+
+                  {session.status === "awaiting" && (
+                    <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
+                      <a href={session.intentUri} style={{ ...styles.secondaryBtn, textDecoration: "none" }}>
+                        Open UPI app
+                      </a>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard?.writeText(session.intentUri);
+                        }}
+                        style={styles.secondaryBtn}
+                      >
+                        Copy link
+                      </button>
+                    </div>
+                  )}
+                  <p style={{ fontSize: 10, color: "#B0AAA0", marginTop: 12, wordBreak: "break-all" }}>
+                    Ref {session.reference}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -642,10 +851,27 @@ const QuickCheckout = () => {
               <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
                 <CheckCircle size={40} color="#16a34a" />
               </div>
-              <h1 style={{ fontSize: 24, fontWeight: 700, color: "#161616", marginBottom: 8 }}>Payment Successful! 🎉</h1>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: "#161616", marginBottom: 8 }}>
+                {session?.status === "paid" ? "Payment received" : "Enquiry Submitted!"}
+              </h1>
               <p style={{ fontSize: 15, color: "#656565", marginBottom: 24 }}>
-                Your {category} campaign with {locationCount} locations for {duration} {duration === 1 ? 'month' : 'months'} is confirmed.
+                {session?.status === "paid" ? (
+                  <>
+                    We&apos;ve received ₹{(session.amount || 0).toLocaleString()} for your {category} campaign
+                    across {locationCount} location{locationCount > 1 ? "s" : ""}. Our team will reach out shortly.
+                  </>
+                ) : (
+                  <>
+                    Your {category} campaign enquiry with {locationCount} locations has been received. Our team
+                    will reach out shortly.
+                  </>
+                )}
               </p>
+              {session?.reference && (
+                <p style={{ fontSize: 11, color: "#949494", marginBottom: 20, wordBreak: "break-all" }}>
+                  Ref {session.reference}
+                </p>
+              )}
               <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
                 <a href="/" style={{ ...styles.primaryBtn, textDecoration: "none", width: "auto", marginTop: 0 }}>Back to Home</a>
               </div>
@@ -663,9 +889,9 @@ const QuickCheckout = () => {
               </div>
               <div style={{ padding: 18 }}>
                 <div style={{ textAlign: "center", padding: "20px 0", borderBottom: "1px solid #E7E2D8", marginBottom: 16 }}>
-                  <p style={{ fontSize: 12, color: "#949494", marginBottom: 4 }}>{paymentChoice === "full" ? "Total Amount" : "Booking Fee"}</p>
-                  <p style={{ fontSize: 36, fontWeight: 700, color: "#F2701D" }}>₹{(paymentChoice === "full" ? total : 999).toLocaleString()}</p>
-                  <p style={{ fontSize: 11, color: "#949494", marginTop: 4 }}>Total campaign value: ₹{total.toLocaleString()}</p>
+                  <p style={{ fontSize: 12, color: "#949494", marginBottom: 4 }}>Booking Fee</p>
+                  <p style={{ fontSize: 36, fontWeight: 700, color: "#F2701D" }}>₹{advancePayment.toLocaleString()}</p>
+                  <p style={{ fontSize: 11, color: "#949494", marginTop: 4 }}>Total campaign value: ₹{total.toLocaleString()} &middot; balance requested later</p>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
@@ -723,21 +949,13 @@ const QuickCheckout = () => {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "12px 0", borderTop: "2px solid #E7E2D8" }}>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontWeight: 700, fontSize: 15, color: "#161616" }}>{paymentChoice === "full" ? "Pay Now (Full)" : "Pay Now (Booking)"}</span>
-                    <span style={{ fontWeight: 700, fontSize: 20, color: "#F2701D" }}>₹{(paymentChoice === "full" ? total : advancePayment).toLocaleString()}</span>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: "#161616" }}>Pay Now (Booking)</span>
+                    <span style={{ fontWeight: 700, fontSize: 20, color: "#F2701D" }}>₹{advancePayment.toLocaleString()}</span>
                   </div>
-                  {paymentChoice !== "full" && (
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 12, color: "#949494" }}>Balance (after confirmation)</span>
-                      <span style={{ fontSize: 12, color: "#949494" }}>₹{(total - advancePayment).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {paymentChoice === "full" && (
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 12, color: "#16a34a" }}>No balance due</span>
-                      <span style={{ fontSize: 12, color: "#16a34a" }}>₹0</span>
-                    </div>
-                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12, color: "#949494" }}>Balance (requested later)</span>
+                    <span style={{ fontSize: 12, color: "#949494" }}>₹{Math.max(0, total - advancePayment).toLocaleString()}</span>
+                  </div>
                 </div>
                 <div style={{ marginTop: 16, padding: "10px 14px", background: "#f0fdf4", borderRadius: 8, display: "flex", alignItems: "center", gap: 8 }}>
                   <CheckCircle size={14} color="#16a34a" />

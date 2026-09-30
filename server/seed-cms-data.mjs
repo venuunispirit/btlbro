@@ -48,6 +48,17 @@ c.hero_features = {
   ],
 };
 
+c.marquee = {
+  items: [
+    { title: 'Retail Activation', desc: 'Engaging customers directly at retail locations.', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80' },
+    { title: 'Event Marketing', desc: 'Creating memorable brand experiences.', image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80' },
+    { title: 'Brand Experience', desc: 'Turning interactions into connections.', image: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80' },
+    { title: 'Field Research', desc: 'Ground insights that guide strategy.', image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=900&q=80' },
+    { title: 'Digital Amplification', desc: 'Extending reach across every channel.', image: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=900&q=80' },
+  ],
+  speed_seconds: '5',
+};
+
 c.hero_stats = {
   items: [
     { value: '500+', label: 'Activations Executed' },

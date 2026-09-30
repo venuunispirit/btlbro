@@ -210,7 +210,7 @@ function googleCatchment_(body) {
     }
   }
 
-  var gmapLink = (lat && lng) ? 'https://www.google.com/maps?q=' + lat + ',' + lng : '';
+  var gmapLink = body.gmapLink || (lat && lng ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(displayName) : '');
 
   // Found an existing row
   if (matchRow !== -1) {

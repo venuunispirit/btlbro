@@ -90,7 +90,7 @@ router.get('/geocode', async (req, res) => {
 // type → Google includedTypes mapping lives here so the frontend stays simple.
 const TYPE_TO_GOOGLE = {
   apartments: ['apartment_building', 'apartment_complex'],
-  corporates: ['office', 'corporate_office'],
+  corporates: ['corporate_office', 'coworking_space'],
   cafes: ['cafe', 'coffee_shop', 'restaurant'],
   supermarkets: ['supermarket', 'convenience_store', 'grocery_store'],
   malls: ['shopping_mall', 'department_store'],
@@ -98,9 +98,15 @@ const TYPE_TO_GOOGLE = {
   colleges: ['university'],
   cinema: ['movie_theater'],
   parks: ['park'],
-  hospitals: ['hospital', 'clinic'],
+  hospitals: ['hospital', 'medical_center'],
   convention_centers: ['banquet_hall', 'convention_center', 'event_venue'],
 };
+
+// Types Google's Nearby (New) searchNearby rejects outright. We drop them
+// instead of letting one bad type fail the whole batch request.
+const UNSUPPORTED_NEARBY_TYPES = new Set([
+  'office', 'business_operation', 'office_building', 'clinic', 'health',
+]);
 
 router.get('/nearby', async (req, res) => {
   try {
@@ -110,7 +116,9 @@ router.get('/nearby', async (req, res) => {
     const lat = parseFloat(req.query.lat);
     const lng = parseFloat(req.query.lng);
     if (Number.isNaN(lat) || Number.isNaN(lng)) return res.status(400).json({ error: 'lat/lng required' });
-    const radius = Math.min(Math.max(parseInt(req.query.radius) || 5000, 1000), 10000);
+    // The user-selected radius IS the only limit — Google returns its full
+    // in-radius set. 50,000m is Google's hard per-search cap.
+    const radius = Math.min(Math.max(parseInt(req.query.radius) || 5000, 1000), 50000);
 
     const types = String(req.query.types || '')
       .split(',')
@@ -118,38 +126,62 @@ router.get('/nearby', async (req, res) => {
       .filter((t) => TYPE_TO_GOOGLE[t]);
     if (types.length === 0) return res.json({ places: [] });
 
-    const body = {
-      includedTypes: types.flatMap((t) => TYPE_TO_GOOGLE[t]),
-      maxResultCount: 10,
-      locationRestriction: {
-        circle: { center: { latitude: lat, longitude: lng }, radius },
-      },
-    };
+    // Google caps each searchNearby call at 20 results (pagination removed in
+    // the New API). To return EVERYTHING inside the user's radius we fire one
+    // request PER catchment type — each gets its own 20 in-radius, then we
+    // merge + dedupe. No artificial business limit is applied on top of that.
 
-    const resp = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.displayName,places.location,places.types,places.id',
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await resp.json();
-    if (!resp.ok) return res.status(502).json({ places: [], error: (data.error && data.error.message) || `HTTP ${resp.status}` });
+    async function searchOne(includedTypes) {
+      const body = {
+        includedTypes,
+        maxResultCount: 20,
+        locationRestriction: {
+          circle: { center: { latitude: lat, longitude: lng }, radius },
+        },
+      };
+      try {
+        const resp = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'places.displayName,places.location,places.types,places.id',
+          },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) return [];
+        return (data.places || []).map((p) => ({
+          place_id: p.id,
+          name: (p.displayName && p.displayName.text) || 'Unknown',
+          lat: p.location.latitude,
+          lng: p.location.longitude,
+          types: p.types || [],
+        }));
+      } catch {
+        return [];
+      }
+    }
 
-    const places = (data.places || []).map((p) => ({
-      place_id: p.id,
-      name: (p.displayName && p.displayName.text) || 'Unknown',
-      lat: p.location.latitude,
-      lng: p.location.longitude,
-      types: p.types || [],
+    const batches = await Promise.all(types.map(async (t) => {
+      // Drop any Google-rejected type so one bad value never empties a request.
+      const includedTypes = TYPE_TO_GOOGLE[t].filter((g) => !UNSUPPORTED_NEARBY_TYPES.has(g));
+      if (includedTypes.length === 0) return [];
+      return searchOne(includedTypes);
     }));
+
+    const seen = new Map();
+    for (const batch of batches) {
+      for (const p of batch) {
+        if (!seen.has(p.place_id)) seen.set(p.place_id, p);
+      }
+    }
+    const places = [...seen.values()];
 
     // Auto-surface non-inhouse places into catchment tabs (fire-and-forget)
     surfaceNearby(places);
 
-    res.json({ places });
+    res.json({ places, count: places.length, radius });
   } catch (error) {
     res.status(502).json({ places: [], error: error.message });
   }

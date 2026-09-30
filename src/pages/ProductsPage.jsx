@@ -321,6 +321,10 @@ export default function ProductsPage() {
       setUser(data.user);
       setAuthOpen(false);
       setToast(`Welcome, ${data.user.name.split(" ")[0]}!`);
+      if (authMode === "login" && data.user?.is_team) {
+        window.location.replace("/admin");
+        return;
+      }
       if (cart.length > 0) {
         try { const resp = await mergeGuestCart(cart); if (resp.cart) setCart(resp.cart); } catch {}
       }

@@ -78,7 +78,7 @@ export function surfaceNearby(places) {
       const count = dbHelpers.bumpGoogleSeen(key);
       const displayName = count >= 2 ? `${baseName} (${count - 1})` : baseName;
 
-      queueGoogleSurface({ tab, baseName, name: displayName, lat: place.lat, lng: place.lng });
+      queueGoogleSurface({ tab, baseName, name: displayName, lat: place.lat, lng: place.lng, place_id: place.place_id });
       queued++;
     }
 

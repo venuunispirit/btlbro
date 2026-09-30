@@ -61,6 +61,7 @@ export default function Dashboard({ onNavigate }) {
         const data = await apiLogin(authForm.email, authForm.password);
         setUser(data.user);
         window.dispatchEvent(new CustomEvent("btl-auth-change", { detail: { user: data.user } }));
+        if (data.user?.is_team) { onNavigate?.(data.user.role === "recee" ? "/recee" : "/dashboard"); return; }
       } else {
         const data = await apiRegister(authForm.name, authForm.email, authForm.password);
         setSession(data.user, data.token);

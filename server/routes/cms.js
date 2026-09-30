@@ -145,11 +145,11 @@ router.delete('/products/:id', requireStaff, (req, res) => {
 // PUT  /api/admin/records/:id  { field, value }               (staff, Manager+)
 router.get('/records', (req, res) => {
   try {
-    const { file, page = 1, limit = 200, search = '' } = req.query;
-    const limitN = Math.min(Number(limit) || 200, 500);
+    const { file, page = 1, limit = 200, search = '', include_inactive } = req.query;
+    const limitN = Math.min(Number(limit) || 200, 2000);
     const pageN = Math.max(Number(page) || 1, 1);
 
-    let records = dbHelpers.getAllRecords();
+    let records = include_inactive === 'true' ? dbHelpers.getAllRecordsRaw() : dbHelpers.getAllRecords();
     if (file) records = records.filter((r) => r.file_id === Number(file));
     if (search && search !== '__all__') {
       const q = search.toLowerCase();
@@ -183,10 +183,74 @@ router.put('/records/:id', requireStaff, (req, res) => {
       val = val === null ? null : '';
     }
 
-    dbHelpers.patchRecordData(Number(req.params.id), { [field]: val });
+    dbHelpers.patchRecordData(Number(req.params.id), { [field]: val, edited_by: req.user?.name || 'Admin' });
     res.json({ success: true, record: dbHelpers.getRecordById(Number(req.params.id)) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update record', details: error.message });
+  }
+});
+
+// POST /api/admin/records/assign — bulk assign location records to a team member
+// (Recee/ops). Stamps assigned_to / assigned_to_name / assigned_by / assigned_at
+// and starts the recee workflow (pending) on each selected record.
+router.post('/records/assign', requireStaff, (req, res) => {
+  try {
+    if (roleLevel(req.user.role) < 1) return res.status(403).json({ error: 'Only Manager+ can assign location data' });
+    const { ids, member_id } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids (record ids) are required' });
+    if (!member_id) return res.status(400).json({ error: 'member_id is required' });
+
+    const member = dbHelpers.getUserById(Number(member_id));
+    if (!member || !member.is_team) return res.status(404).json({ error: 'Team member not found' });
+
+    const now = new Date().toISOString();
+    let assigned = 0;
+    for (const id of ids) {
+      const record = dbHelpers.getRecordById(Number(id));
+      if (!record) continue;
+      record.data.assigned_to = member.id;
+      record.data.assigned_to_name = member.name;
+      record.data.assigned_by = req.user?.name || 'Admin';
+      record.data.assigned_at = now;
+      if (!record.data.recee_status || record.data.recee_status === 'done') {
+        record.data.recee_status = 'pending';
+      }
+      record.data.needs_recee = true;
+      record.data.updated_at = now;
+      assigned++;
+    }
+    if (assigned) dbHelpers.write();
+    res.json({ success: true, assigned, member: { id: member.id, name: member.name } });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to assign records', details: error.message });
+  }
+});
+
+// POST /api/admin/records/recee-status — bulk set recee_status (pending/in_progress/done)
+router.post('/records/recee-status', requireStaff, (req, res) => {
+  try {
+    if (roleLevel(req.user.role) < 1) return res.status(403).json({ error: 'Only Manager+ can update recee status' });
+    const { ids, status } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids are required' });
+    const VALID = ['pending', 'in_progress', 'done'];
+    if (!VALID.includes(status)) return res.status(400).json({ error: 'status must be pending | in_progress | done' });
+
+    const now = new Date().toISOString();
+    let updated = 0;
+    for (const id of ids) {
+      const record = dbHelpers.getRecordById(Number(id));
+      if (!record) continue;
+      record.data.recee_status = status;
+      record.data.recee_status_at = now;
+      record.data.recee_status_by = req.user?.name || 'Admin';
+      record.data.updated_at = now;
+      if (status === 'done') record.data.needs_recee = false;
+      updated++;
+    }
+    if (updated) dbHelpers.write();
+    res.json({ success: true, updated });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update recee status', details: error.message });
   }
 });
 

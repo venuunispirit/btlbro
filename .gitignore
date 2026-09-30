@@ -3,3 +3,19 @@ dist/
 .env
 .env.local
 *.log
+
+# Reversible-password vault key (server/services/passwordVault.js). The
+# encrypted passwords live in db.json — this key must never be committed.
+server/data/.vault-key
+
+# Scratch dirs built by server/*.test.mjs — each test copies the real sources
+# here with a patched db path. Never commit these; they are throwaway copies
+# that go stale the moment the source changes.
+server/.test-run/
+server/.test-run-upi/
+server/.test-run-vendors/
+server/.test-run-links/
+server/.test-run-po/
+server/.test-run-recee/
+server/.test-run-dept/
+server/.test-run-call/
