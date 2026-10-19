@@ -392,7 +392,7 @@ const s = {
     background: '#FAF9F7', border: '1px solid #E7E2D8', borderRadius: 8, color: '#4A4A4A',
     fontSize: 12, cursor: 'pointer',
   },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))', gap: 12 },
   card: {
     display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', cursor: 'pointer',
     background: '#FAF9F7', border: '1px solid #E7E2D8', borderRadius: 12, padding: 14, font: 'inherit',

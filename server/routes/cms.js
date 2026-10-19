@@ -16,6 +16,40 @@ import { roleLevel } from '../middleware/staffAuth.js';
 
 const router = express.Router();
 
+// Columns on a record that are metadata, never a sellable service. Mirrors the
+// list in routes/recee.js so a request auto-created from a location row prices
+// the same services the field team would otherwise be told to check.
+const SERVICE_CORE = new Set([
+  'sheet_id', 'name', 'type', 'tab_name', 'sl_no', 'pin_code', 'has_pin_column',
+  'distance_km', 'has_distance_column', 'lat', 'lng', 'gmap_link', 'gmap_query',
+  'is_active', 'created_at', 'updated_at', 'source', 'edited_locally', 'edited_at',
+  'distance', 'apartment', 'id', 'row', 'file_id', 'services',
+  'assigned_to', 'assigned_to_name', 'assigned_by', 'assigned_at',
+  'recee_status', 'recee_status_at', 'recee_status_by', 'needs_recee', 'edited_by',
+]);
+
+// The service names a location row is listed/priced for: the modern `services`
+// map first, then any numeric non-core column (the legacy flat layout).
+function recordServiceNames(data) {
+  const names = [];
+  const seen = new Set();
+  const add = (n) => {
+    const name = String(n || '').trim();
+    const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (name && key && !seen.has(key)) { seen.add(key); names.push(name); }
+  };
+  const d = data || {};
+  if (d.services && typeof d.services === 'object' && !Array.isArray(d.services)) {
+    Object.keys(d.services).forEach(add);
+  }
+  for (const [k, v] of Object.entries(d)) {
+    if (SERVICE_CORE.has(k) || v === null || v === undefined || v === '') continue;
+    const clean = String(v).replace(/[₹,\s]/g, '');
+    if (/^\d+(\.\d+)?$/.test(clean)) add(k.replace(/_/g, ' '));
+  }
+  return names;
+}
+
 // ---------- Content ----------
 router.get('/', (req, res) => {
   try {
@@ -193,6 +227,11 @@ router.put('/records/:id', requireStaff, (req, res) => {
 // POST /api/admin/records/assign — bulk assign location records to a team member
 // (Recee/ops). Stamps assigned_to / assigned_to_name / assigned_by / assigned_at
 // and starts the recee workflow (pending) on each selected record.
+//
+// Assigning in the Data section IS the recee assignment: alongside the record
+// stamp, a site-survey request is created (or re-pointed) for the assignee so
+// the location shows up on that recee's screen. The two systems stay in sync
+// without the manager having to re-enter the location as a separate request.
 router.post('/records/assign', requireStaff, (req, res) => {
   try {
     if (roleLevel(req.user.role) < 1) return res.status(403).json({ error: 'Only Manager+ can assign location data' });
@@ -204,13 +243,24 @@ router.post('/records/assign', requireStaff, (req, res) => {
     if (!member || !member.is_team) return res.status(404).json({ error: 'Team member not found' });
 
     const now = new Date().toISOString();
+    const byName = req.user?.name || 'Admin';
+    // One pass over open requests, keyed by the location row they verify, so a
+    // bulk assign re-points an existing request instead of minting duplicates.
+    const openByRecord = new Map();
+    for (const s of dbHelpers.getSiteSurveys()) {
+      if (s.record_id && s.status !== 'done' && s.source === 'request' && !openByRecord.has(s.record_id)) {
+        openByRecord.set(s.record_id, s);
+      }
+    }
     let assigned = 0;
+    let surveysCreated = 0;
+    let surveysUpdated = 0;
     for (const id of ids) {
       const record = dbHelpers.getRecordById(Number(id));
       if (!record) continue;
       record.data.assigned_to = member.id;
       record.data.assigned_to_name = member.name;
-      record.data.assigned_by = req.user?.name || 'Admin';
+      record.data.assigned_by = byName;
       record.data.assigned_at = now;
       if (!record.data.recee_status || record.data.recee_status === 'done') {
         record.data.recee_status = 'pending';
@@ -218,9 +268,57 @@ router.post('/records/assign', requireStaff, (req, res) => {
       record.data.needs_recee = true;
       record.data.updated_at = now;
       assigned++;
+
+      // Keep the recee's screen in step with the assignment. An open request
+      // for this location is re-pointed to the new assignee; otherwise one is
+      // created so the capture has the location's coordinates to verify against.
+      // Only a recee-team assignee can act on it, so only then does a request
+      // get created — assigning to anyone else just stamps the row.
+      if (!['recee', 'recee_manager'].includes(member.role)) continue;
+      const openRequest = openByRecord.get(record.id);
+      if (openRequest) {
+        dbHelpers.updateSiteSurvey(openRequest.id, {
+          assigned_to_id: member.id,
+          assigned_to_name: member.name,
+          assigned_by_id: req.user?.id,
+          assigned_by_name: byName,
+          assigned_at: now,
+          status: openRequest.status === 'in_progress' ? 'in_progress' : 'assigned',
+        });
+        openRequest.status = openRequest.status === 'in_progress' ? 'in_progress' : 'assigned';
+        openRequest.assigned_to_id = member.id;
+        surveysUpdated++;
+      } else {
+        const d = record.data || {};
+        const targetLat = Number.isFinite(Number(d.lat)) ? Number(d.lat) : null;
+        const targetLng = Number.isFinite(Number(d.lng)) ? Number(d.lng) : null;
+        const created = dbHelpers.addSiteSurvey({
+          title: d.name || d.apartment || `Location #${record.id}`,
+          address: d.address || d.apartment || d.name || '',
+          notes: '',
+          services: recordServiceNames(d).map((name) => ({ name, available: null, price: null })),
+          prices: {},
+          target_lat: targetLat,
+          target_lng: targetLng,
+          record_id: record.id,
+          target_source: dbHelpers.recordSource(record),
+          radius_m: 200,
+          status: targetLat == null ? 'no_target' : 'assigned',
+          assigned_to_id: member.id,
+          assigned_to_name: member.name,
+          assigned_by_id: req.user?.id,
+          assigned_by_name: byName,
+          assigned_at: now,
+          created_by_id: req.user?.id,
+          created_by_name: byName,
+          source: 'request',
+        });
+        openByRecord.set(record.id, created);
+        surveysCreated++;
+      }
     }
     if (assigned) dbHelpers.write();
-    res.json({ success: true, assigned, member: { id: member.id, name: member.name } });
+    res.json({ success: true, assigned, member: { id: member.id, name: member.name }, surveys_created: surveysCreated, surveys_updated: surveysUpdated });
   } catch (error) {
     res.status(500).json({ error: 'Failed to assign records', details: error.message });
   }

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, X, Check, ArrowDownLeft, ArrowUpRight, FileText, Package, Loader2 } from 'lucide-react';
+import { Search, Bell, X, Check, ArrowDownLeft, ArrowUpRight, FileText, Package, Loader2, Menu } from 'lucide-react';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api.js';
 import { useGlobalSearch, setGlobalSearch } from '../useGlobalSearch.js';
 
@@ -55,7 +55,7 @@ function fmtWhen(iso) {
   return then.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 }
 
-export default function Topbar({ staff, activeLabel, subtitle, onNavigate }) {
+export default function Topbar({ staff, activeLabel, subtitle, onNavigate, onOpenMenu }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const inputRef = useRef(null);
   const search = useGlobalSearch();
@@ -102,16 +102,22 @@ export default function Topbar({ staff, activeLabel, subtitle, onNavigate }) {
   }
 
   return (
-    <header style={styles.topbar}>
+    <header className="admin-topbar" style={styles.topbar}>
+      {/* Mobile-only drawer trigger — hidden on desktop, where the rail is
+          already visible and a hamburger would be redundant. */}
+      <button className="admin-menu-btn" onClick={onOpenMenu} aria-label="Open menu">
+        <Menu size={20} />
+      </button>
+
       {/* Col 1 — Page heading. The optional subtitle sits under the name so
           tabs can orient the page without spending a row of their own. */}
-      <div style={styles.pageHeading}>
-        <h1 style={styles.pageTitle}>{activeLabel || 'Dashboard'}</h1>
-        {subtitle && <p style={styles.pageSubtitle}>{subtitle}</p>}
+      <div className="admin-page-heading" style={styles.pageHeading}>
+        <h1 className="admin-page-title" style={styles.pageTitle}>{activeLabel || 'Dashboard'}</h1>
+        {subtitle && <p className="admin-page-subtitle" style={styles.pageSubtitle}>{subtitle}</p>}
       </div>
 
       {/* Col 2 — Search pill + Notification (centred) */}
-      <div style={styles.actionsCenter}>
+      <div className="admin-actions-center" style={styles.actionsCenter}>
         <div
           style={{
             ...styles.searchWrap,
@@ -153,7 +159,7 @@ export default function Topbar({ staff, activeLabel, subtitle, onNavigate }) {
 
       {/* Col 3 — notifications, pinned to the far right so the search pill can
           sit truly centred instead of being pushed off-axis by the bell. */}
-      <div style={styles.actionsRight}>
+      <div className="admin-actions-right" style={styles.actionsRight}>
         <button
           style={{ ...styles.iconBtn, position: 'relative' }}
           onClick={() => setPanel((p) => !p)}
@@ -220,8 +226,8 @@ const styles = {
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
-    padding: '18px 26px',
     background: 'transparent',
+    minWidth: 0,
   },
   pageHeading: {
     display: 'flex',
@@ -304,9 +310,10 @@ const styles = {
   rowMeta: { fontSize: 10.5, color: '#949494' },
   rowDot: { width: 7, height: 7, borderRadius: 999, background: '#F2701D', marginTop: 6, flexShrink: 0 },
   actionsCenter: {
-    position: 'absolute',
-    left: '50%',
-    transform: 'translateX(-50%)',
+    // Centring is done in admin.css (.admin-actions-center) rather than inline,
+    // because on narrow screens it has to un-centre and sit at the end of the
+    // wrapped row instead — an inline position/transform could not be undone by
+    // a media query.
     display: 'flex',
     alignItems: 'center',
     gap: 8,

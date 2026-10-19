@@ -153,7 +153,7 @@ export default function DepartmentsTab() {
           hint="Create departments to organise your team — BD, Operations, Recee and so on. Members are assigned a department from the Team tab."
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(430px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(430px, 100%), 1fr))', gap: 16 }}>
           {departments.map(d => {
             const active = d.is_active !== false;
             const count = memberCount(d);
@@ -272,6 +272,7 @@ export default function DepartmentsTab() {
                 <p style={{ fontSize: 12.5, margin: '6px 0 0' }}>Assign members from the Team tab (Department field).</p>
               </div>
             ) : (
+              <div className="scroll-x">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#FAF9F7' }}>
@@ -322,6 +323,7 @@ export default function DepartmentsTab() {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>
@@ -343,7 +345,7 @@ export default function DepartmentsTab() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setShowForm(false)}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: '#fff', borderRadius: 16, padding: 28, width: 420, maxWidth: '92vw',
+            background: '#fff', borderRadius: 16, padding: 22, width: 380, maxWidth: '92vw',
             boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>

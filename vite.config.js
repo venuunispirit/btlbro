@@ -13,11 +13,30 @@ import react from "@vitejs/plugin-react";
 const API_PORT = process.env.API_PORT || 8082;
 const apiTarget = `http://localhost:${API_PORT}`;
 
+// Extra Host headers the dev/preview servers accept.
+//
+// Vite rejects requests whose Host header it doesn't recognise (DNS-rebinding
+// protection). `localhost` and bare IPs are always allowed regardless of this
+// list, so it only governs additional names — in practice a Cloudflare tunnel.
+//
+// Quick tunnels hand out a NEW random hostname every time cloudflared
+// restarts, so allow the suffix instead of pinning the one hostname, which
+// would break again on the next tunnel restart. Override or extend with
+// VITE_EXTRA_HOSTS="named.example.com,other.test" for a named tunnel.
+const allowedHosts = [
+  ".trycloudflare.com",
+  ...(process.env.VITE_EXTRA_HOSTS || "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+];
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5174,
     open: true,
+    allowedHosts,
     proxy: {
       "/api": {
         target: apiTarget,
@@ -28,6 +47,10 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  // `vite preview` runs its own host check, so it needs the same list.
+  preview: {
+    allowedHosts,
   },
 });
 

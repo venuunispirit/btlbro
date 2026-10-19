@@ -349,6 +349,118 @@ export async function createCollectRequest({
   };
 }
 
+/**
+ * Re-point every still-open checkout request at a new booking amount.
+ *
+ * The amount on a ledger row is a snapshot of what was asked for, which is
+ * exactly right once money has moved — history must not be rewritten. But a
+ * request nobody has paid yet should follow the price the admin just set, or
+ * the ledger, the lead and the QR on a customer's screen all disagree with
+ * Settings while looking perfectly current.
+ *
+ * So: only `awaiting` rows raised by the checkout flow are touched (never a
+ * paid/failed row, never a staff collection someone created deliberately with
+ * its own amount). Each row gets the new amount, a rebuilt UPI intent, and a
+ * regenerated PayU QR if one was tracking it — falling back to the plain local
+ * intent if the gateway refuses, so a wrong-amount QR is never displayed.
+ *
+ * Updates run through `updatePayment`, which emits on the payment event bus —
+ * an open checkout tab watching that reference re-renders its QR immediately.
+ *
+ * Returns the number of rows retargeted.
+ */
+export async function retargetAwaitingBookingPayments({ newAmount, callbackBase = '' } = {}) {
+  const amount = validateAmount(newAmount);
+  if (!amount.ok) return 0;
+
+  const upi = upiSettings();
+  const rows = dbHelpers.getPayments().filter(p =>
+    p.status === 'awaiting'
+    && p.direction === 'in'
+    && p.lead_id
+    && p.created_by_name === 'Checkout'
+    && Number(p.amount) !== amount.amount
+  );
+  if (!rows.length) return 0;
+
+  const payuConfigured = describeConfig().payments.configured;
+  let updated = 0;
+
+  for (const row of rows) {
+    // Rebuild the fixed-amount intent first — it works with zero gateway
+    // credentials, so the request stays valid even if PayU is down.
+    let intentUri = row.intent_uri;
+    try {
+      intentUri = buildUpiUri({
+        vpa: row.vpa || upi.collection_vpa,
+        payeeName: upi.collection_name || '',
+        amount: amount.amount,
+        note: row.note || 'Campaign booking amount',
+        txnRef: row.reference,
+        mcc: row.mcc || MCC.GENERIC,
+      });
+    } catch {
+      // Keep the old intent rather than store a broken one; the row still
+      // carries the new amount for the ledger and the lead.
+    }
+
+    const patch = { amount: amount.amount, intent_uri: intentUri };
+
+    // A PayU-tracked QR has the amount baked into a gateway-side transaction.
+    // Re-issue it under the same txnid so the callback still lands on this
+    // row; if the gateway refuses, drop the stale QR fields so no wrong-
+    // amount QR can be shown anywhere — the local intent above stays valid.
+    if (row.rail === 'payu' && payuConfigured && !row.payu_status) {
+      const txnid = row.payu_txnid || row.reference;
+      const qr = await createDynamicQr({
+        txnid,
+        amount: amount.amount,
+        note: row.note || 'Payment',
+        payeeName: upi.collection_name || 'BTLbro',
+        email: row.counterparty_email || '',
+        phone: row.counterparty_phone || '',
+        callbackBase,
+      });
+      if (qr.ok) {
+        let link = '';
+        if (qr.data.merchant_vpa) {
+          const linkRes = await generateIntentLink({
+            txnId: txnid,
+            amount: amount.amount,
+            note: row.note || 'Payment',
+            merchantVpa: qr.data.merchant_vpa,
+          });
+          if (linkRes.ok) link = linkRes.data.link;
+        }
+        patch.payu_qr_string = qr.data.qr_string || '';
+        patch.payu_link = link;
+        patch.payu_merchant_vpa = qr.data.merchant_vpa || '';
+        patch.payu_payment_id = qr.data.payment_id || row.payu_payment_id || '';
+      } else {
+        patch.payu_qr_string = '';
+        patch.payu_link = '';
+        patch.rail = 'local';
+      }
+    }
+
+    const done = dbHelpers.updatePayment(row.id, patch);
+    if (!done) continue;
+    updated += 1;
+
+    // The lead's own money fields were snapshotted from the same figure at
+    // checkout. An unpaid booking's quote should follow the new price too.
+    const lead = row.lead_id ? dbHelpers.getLeadById?.(row.lead_id) : null;
+    if (lead && lead.payment_status !== 'paid') {
+      dbHelpers.updateLead(lead.id, {
+        bookingAmount: amount.amount,
+        amountPaid: amount.amount,
+      });
+    }
+  }
+
+  return updated;
+}
+
 // Collect against a specific lead or shop order, so the money is attributable
 // the moment it is requested. The Leads and Orders tabs call this instead of
 // the generic /collect, which has no idea what it is collecting for.

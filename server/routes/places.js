@@ -9,6 +9,8 @@
 
 import express from 'express';
 import { surfaceNearby } from '../services/googleSurface.js';
+import { queueBackfill, flushGoogleSoon } from '../services/sheetBackfill.js';
+import { dbHelpers } from '../db.js';
 
 const router = express.Router();
 
@@ -80,6 +82,52 @@ router.get('/geocode', async (req, res) => {
   }
 });
 
+// Static map image proxy.
+//
+//   GET /api/places/staticmap?lat=<n>&lng=<n>[&zoom=15][&size=600x270]
+//
+// The Google Static Maps API key stays on the server — the browser only ever
+// requests this proxy, never Google directly. Returns the raw PNG with a cache
+// header so repeat views (same site, same size) don't re-bill the API.
+// Falls back to a 502 JSON error the caller can turn into a placeholder.
+router.get('/staticmap', async (req, res) => {
+  try {
+    const lat = parseFloat(req.query.lat);
+    const lng = parseFloat(req.query.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return res.status(400).json({ error: 'lat/lng required' });
+
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'GOOGLE_MAPS_API_KEY not set' });
+
+    // Static Maps caps a single render at 640x640 (free tier) — clamp to it.
+    const size = String(req.query.size || '600x270').trim();
+    const zoom = Math.min(Math.max(parseInt(req.query.zoom, 10) || 15, 1), 20);
+
+    const params = new URLSearchParams({
+      key: apiKey,
+      center: `${lat},${lng}`,
+      zoom: String(zoom),
+      size: /^\d{2,3}x\d{2,3}$/.test(size) ? size : '600x270',
+      maptype: 'roadmap',
+      markers: `color:0xF2701D|size:mid|label:S|${lat},${lng}`,
+    });
+
+    const resp = await fetch(`https://maps.googleapis.com/maps/api/staticmap?${params}`);
+    const contentType = resp.headers.get('content-type') || '';
+    if (!resp.ok || !contentType.startsWith('image/')) {
+      const text = await resp.text().catch(() => '');
+      return res.status(502).json({ error: `Static Maps error`, detail: text.slice(0, 200) });
+    }
+
+    const buf = Buffer.from(await resp.arrayBuffer());
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(buf);
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
 // Nearby search for catchment-relevant places around a point (Places API New).
 //
 //   GET /api/places/nearby?lat=<n>&lng=<n>&radius=<m>&types=cafe,supermarket
@@ -107,6 +155,63 @@ const TYPE_TO_GOOGLE = {
 const UNSUPPORTED_NEARBY_TYPES = new Set([
   'office', 'business_operation', 'office_building', 'clinic', 'health',
 ]);
+
+// Track a searched location from the Marketing Tool so it reaches the master
+// sheet (CRM Backfill) and immediately appears in the Data tab.
+//
+//   POST /api/places/track  { name, lat, lng, type, source }
+router.post('/track', (req, res) => {
+  try {
+    const { name, lat, lng, type, source } = req.body || {};
+    const nm = String(name || '').trim();
+    if (!nm) return res.status(400).json({ error: 'name required' });
+    const lt = Number(lat);
+    const lg = Number(lng);
+    if (!Number.isFinite(lt) || !Number.isFinite(lg)) {
+      return res.status(400).json({ error: 'lat/lng required' });
+    }
+
+    const src = source === 'from google' || source === 'google' ? 'from google' : 'inhouse';
+    const t = String(type || 'searched').trim() || 'searched';
+
+    queueBackfill({ name: nm, type: t, lat: lt, lng: lg, source: src });
+    // Push the row to the master sheet now (fire-and-forget) so the location
+    // reaches CRM Backfill instead of waiting for a manual flush.
+    flushGoogleSoon();
+
+    // Best-effort: upsert an active record so it shows in the Data tab before
+    // the next sheet sync. It is flagged `crm_backfill` so a sync never
+    // deactivates it while the sheet write is still in flight. The sheet
+    // remains the source of truth.
+    try {
+      dbHelpers.upsertRecord({
+        sheet_id: `${t} | ${nm}`,
+        name: nm,
+        source: src === 'from google' ? 'google' : src,
+        type: t,
+        tab_name: t,
+        sl_no: '',
+        pin_code: '',
+        has_pin_column: false,
+        distance_km: 0,
+        has_distance_column: false,
+        lat: lt,
+        lng: lg,
+        gmap_link: '',
+        gmap_query: nm,
+        services: {},
+        crm_backfill: true,
+        is_active: true,
+      });
+    } catch (e) {
+      // record upsert is best-effort — never fail the request over it
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 router.get('/nearby', async (req, res) => {
   try {

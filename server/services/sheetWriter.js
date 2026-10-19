@@ -188,7 +188,8 @@ export async function upsertGoogleCatchment({ spreadsheetId, tab, baseName, name
     }
   }
 
-  const gmapLink = buildGmapLink({ name: displayName ? stripCounter(displayName) : '', lat, lng, place_id: body.place_id || '' });
+  const display = String(name || baseName || '').trim();
+  const gmapLink = buildGmapLink({ name: display, lat, lng });
 
   // Existing inhouse row → never touch.
   if (matchRow !== -1 && matchSource.includes('inhouse')) {
@@ -199,13 +200,13 @@ export async function upsertGoogleCatchment({ spreadsheetId, tab, baseName, name
     // Update name + coords (single batch call).
     const updates = [];
     const cell = (r, c) => `${sheetName}!${String.fromCharCode(64 + c + 1)}${r + 1}`;
-    updates.push({ range: cell(matchRow, nameCol), values: [[displayName(name)]] });
+    updates.push({ range: cell(matchRow, nameCol), values: [[display]] });
     if (gmapLink) updates.push({ range: cell(matchRow, gmapCol), values: [[gmapLink]] });
     if (lat) updates.push({ range: cell(matchRow, latCol), values: [[lat]] });
     if (lng) updates.push({ range: cell(matchRow, lngCol), values: [[lng]] });
     updates.push({ range: cell(matchRow, sourceCol), values: [['from google']] });
     await sheets.spreadsheets.values.batchUpdate({ spreadsheetId, resource: { valueInputOption: 'USER_ENTERED', data: updates } });
-    return { action: 'updated', row: matchRow + 1, name: stripCounter(name) };
+    return { action: 'updated', row: matchRow + 1, name: stripCounter(display) };
   }
 
   // Find last row with any data so we append cleanly below it.
@@ -221,7 +222,7 @@ export async function upsertGoogleCatchment({ spreadsheetId, tab, baseName, name
   }
   const newRow = new Array(lastCol).fill('');
   if (slCol >= 0) newRow[slCol] = maxSl + 1;
-  newRow[nameCol] = displayName(name);
+  newRow[nameCol] = display;
   if (gmapCol >= 0) newRow[gmapCol] = gmapLink;
   if (latCol >= 0) newRow[latCol] = lat || '';
   if (lngCol >= 0) newRow[lngCol] = lng || '';
@@ -233,7 +234,7 @@ export async function upsertGoogleCatchment({ spreadsheetId, tab, baseName, name
     valueInputOption: 'USER_ENTERED',
     resource: { values: [newRow] },
   });
-  return { action: 'appended', row: appendAfter + 2, name: stripCounter(name) };
+  return { action: 'appended', row: appendAfter + 2, name: stripCounter(display) };
 }
 
 function displayName(name) {

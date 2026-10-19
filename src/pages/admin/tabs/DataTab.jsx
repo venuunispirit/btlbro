@@ -47,6 +47,7 @@ const CORE_KEYS = new Set([
   'is_active', 'created_at', 'updated_at', 'source', 'edited_locally', 'edited_at', 'edited_by',
   'assigned_to', 'assigned_to_name', 'assigned_by', 'assigned_at', 'recee_status',
   'recee_status_at', 'recee_status_by', 'needs_recee', 'distance', 'apartment', 'id', 'row',
+  'crm_backfill',
 ]);
 
 function pricesOf(d) {
@@ -73,6 +74,29 @@ function pricesOf(d) {
   return out;
 }
 
+// A row's prices keyed by their normalized service name, so a price-column
+// lookup during render is O(1) instead of a scan + regex per column per row.
+// First spelling wins, mirroring the old `entries.find(...normKey === norm)`.
+function normPricesOf(d) {
+  const out = {};
+  const prices = pricesOf(d);
+  Object.keys(prices).forEach((k) => {
+    const nk = normKey(k);
+    if (!(nk in out)) out[nk] = prices[k];
+  });
+  return out;
+}
+
+// Every data row is a fixed single line (nowrap + ellipsis), so the window sees
+// rows of exactly this height. Forced in the styles so the maths stays honest.
+const ROW_H = 34;
+const OVERSCAN = 8;
+
+const TH_STYLE = { padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#949494', borderBottom: '1px solid #E7E2D8', whiteSpace: 'nowrap', background: '#FAF9F7' };
+// Fixed height + box-sizing so every body row is exactly ROW_H tall — the
+// windowing maths depends on it. Module-level so memoized rows keep one ref.
+const TD_STYLE = { padding: '0 10px', height: ROW_H, boxSizing: 'border-box', verticalAlign: 'middle', borderBottom: '1px solid #F0EDE8', fontSize: 12.5, color: '#161616', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+
 const RECEE_STYLES = {
   pending: { bg: '#FEF3C7', fg: '#B45309', label: 'Pending' },
   in_progress: { bg: '#DBEAFE', fg: '#1D4ED8', label: 'In Progress' },
@@ -93,30 +117,50 @@ export default function DataTab() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const search = useGlobalSearch();
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [receeOnly, setReceeOnly] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [assignMember, setAssignMember] = useState('');
-  const [editingCell, setEditingCell] = useState(null);
-  const [editValue, setEditValue] = useState('');
+  const [editingCell, setEditingCell] = useState(null); // { recordId, field } | null
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const inputRef = useRef(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportH, setViewportH] = useState(560);
+  const scrollRef = useRef(null);
+  const sigRef = useRef('');          // lightweight data signature, to skip no-op refreshes
+  const lastLoadRef = useRef(0);      // throttle window-focus refetches
+  const rafRef = useRef(0);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  // Debounce the (topbar-driven) search so a keystroke doesn't refilter 1,600
+  // rows on every character.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // `silent` background refreshes don't flash the loading state, and a refresh
+  // whose data is unchanged is dropped entirely so the (large) table doesn't
+  // repaint for nothing.
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await getRecords({ limit: 2000, include_inactive: true });
-      setRecords(res.records || []);
+      const rows = res.records || [];
+      lastLoadRef.current = Date.now();
+      const sig = `${rows.length}:${rows.reduce((m, r) => (!m || (r.updated_at || '') > m ? (r.updated_at || '') : m), '')}`;
+      if (silent && sig === sigRef.current) return;
+      sigRef.current = sig;
+      setRecords(rows);
     } catch (e) {
       console.error('Failed to load records:', e);
       setNotice('Failed to load records');
       setTimeout(() => setNotice(''), 4000);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   const loadMembers = useCallback(async () => {
@@ -131,11 +175,54 @@ export default function DataTab() {
   useEffect(() => {
     loadData();
     loadMembers();
-    const onFocus = () => loadData();
+    // Focus returns are common (switching windows) and each one used to refetch
+    // and repaint the whole table; throttle them.
+    const onFocus = () => { if (Date.now() - lastLoadRef.current > 15000) loadData(true); };
     window.addEventListener('focus', onFocus);
-    const poll = setInterval(() => loadData(), 60000);
+    const poll = setInterval(() => loadData(true), 60000);
     return () => { window.removeEventListener('focus', onFocus); clearInterval(poll); };
   }, [loadData, loadMembers]);
+
+  // Measure the scroll viewport so the window size tracks the real box.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setViewportH(el.clientHeight || 560);
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', measure);
+    return () => { ro?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [loading]);
+
+  // Scroll back to the top whenever the visible set changes.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    setScrollTop(0);
+  }, [activeTab, debouncedSearch, receeOnly, showInactive]);
+
+  function onScroll() {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const el = scrollRef.current;
+      if (el) setScrollTop(el.scrollTop);
+    });
+  }
+
+  // Per-record derived data, computed once per records change rather than on
+  // every render/keystroke/selection. Keyed by record id.
+  const metaById = useMemo(() => {
+    const m = new Map();
+    records.forEach((r) => {
+      const d = r.data || {};
+      const inactive = d.is_active === false;
+      const rec = receeBadge(d.recee_status);
+      const src = SOURCE_STYLE[String(d.source || 'inhouse').toLowerCase().includes('google') ? 'google' : 'inhouse'];
+      m.set(r.id, { prices: normPricesOf(d), inactive, rec, src });
+    });
+    return m;
+  }, [records]);
 
   // ---- Group records by catchment/tab ----
   const groups = useMemo(() => {
@@ -165,16 +252,13 @@ export default function DataTab() {
 
   // ---- Apply search + status filters per group, build tab data ----
   const tabsData = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
     const applyFilters = (rows) => rows.filter((r) => {
       const d = r.data || {};
       if (!showInactive && d.is_active === false) return false;
       if (receeOnly && !(d.needs_recee || d.recee_status === 'pending')) return false;
-      if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        const hay = JSON.stringify({
-          name: d.name, apartment: d.apartment, pin_code: d.pin_code, address: d.address,
-          sheet_id: d.sheet_id, type: d.type,
-        }).toLowerCase();
+      if (q) {
+        const hay = `${d.name || ''} ${d.apartment || ''} ${d.pin_code || ''} ${d.address || ''} ${d.sheet_id || ''} ${d.type || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -201,21 +285,37 @@ export default function DataTab() {
     ];
 
     return { tabs, perGroup };
-  }, [groups, search, receeOnly, showInactive]);
+  }, [groups, debouncedSearch, receeOnly, showInactive]);
 
   const activeTabData = tabsData.tabs.find((t) => t.type === activeTab) || tabsData.tabs[0];
   const tableRows = activeTabData.rows;
   const allPriceCols = activeTabData.priceCols;
   const isAll = activeTabData.type === 'all';
 
-  // ---- Selection ----
-  function toggleSelect(id) {
+  // ---- Windowing: render only the visible slice, with spacer rows standing in
+  // for the rest so the scrollbar and scroll position stay honest. ----
+  const colCount = 10 + (isAll ? 1 : 0) + allPriceCols.length;
+  // Fixed layout needs explicit widths so columns don't jitter as different
+  // rows pass through the window; minWidth keeps the horizontal scroll honest.
+  const tableMinWidth = 30 + 44 + (isAll ? 120 : 0) + 220 + 90 + 70 + 90 + 100 + 120 + 130 + allPriceCols.length * 110 + 60;
+  const totalRows = tableRows.length;
+  // Clamp the scroll origin so a shrinking list can't push the window past its
+  // end and strand a giant spacer row.
+  const st = Math.min(scrollTop, Math.max(0, totalRows * ROW_H - viewportH));
+  const winStart = Math.max(0, Math.floor(st / ROW_H) - OVERSCAN);
+  const winEnd = Math.min(totalRows, Math.ceil((st + viewportH) / ROW_H) + OVERSCAN);
+  const windowRows = tableRows.slice(winStart, winEnd);
+  const topPad = winStart * ROW_H;
+  const bottomPad = Math.max(0, (totalRows - winEnd) * ROW_H);
+
+  // ---- Selection (stable callbacks so memoized rows don't all re-render) ----
+  const toggleSelect = useCallback((id) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  }
+  }, []);
 
   function toggleAllVisible() {
     const ids = tableRows.map((r) => r.id);
@@ -228,32 +328,28 @@ export default function DataTab() {
   }
 
   // ---- Inline edit (excel style) ----
-  function startEdit(recordId, field, currentValue) {
+  // Only which cell is open lives here; the text being typed lives in the
+  // EditableCell itself, so keystrokes never re-render the table.
+  const startEdit = useCallback((recordId, field) => {
     setEditingCell({ recordId, field });
-    setEditValue(currentValue ?? '');
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }
+  }, []);
 
-  async function saveEdit() {
-    if (!editingCell) return;
+  const cancelEdit = useCallback(() => setEditingCell(null), []);
+
+  const commitEdit = useCallback(async (recordId, field, value) => {
+    setEditingCell(null);
     setSaving(true);
     try {
-      const res = await editRecord(editingCell.recordId, editingCell.field, editValue);
-      setRecords((prev) => prev.map((r) => (r.id === editingCell.recordId ? { ...r, data: res.record.data } : r)));
-      setEditingCell(null);
+      const res = await editRecord(recordId, field, value);
+      setRecords((prev) => prev.map((r) => (r.id === recordId ? { ...r, data: res.record.data } : r)));
+      sigRef.current = ''; // force the next silent refresh to take the change
     } catch (err) {
       setNotice(err.message || 'Save failed');
       setTimeout(() => setNotice(''), 4000);
       console.error('Save failed:', err);
     }
     setSaving(false);
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
-    if (e.key === 'Escape') setEditingCell(null);
-    if (e.key === 'Tab') { e.preventDefault(); saveEdit(); }
-  }
+  }, []);
 
   // ---- Bulk actions ----
   async function handleAssign() {
@@ -293,10 +389,17 @@ export default function DataTab() {
   }
 
   // ---- Suggested members based on selected records' area/pin vs member locations ----
+  // Only the recee team can act on a location assignment, so they are the only
+  // candidates offered here.
+  const receeMembers = useMemo(
+    () => members.filter((m) => ['recee', 'recee_manager'].includes(m.role)),
+    [members],
+  );
+
   const suggestedMembers = useMemo(() => {
-    if (selected.size === 0 || members.length === 0) return [];
+    if (selected.size === 0 || receeMembers.length === 0) return [];
     const selRows = records.filter((r) => selected.has(r.id));
-    const scored = members.map((m) => {
+    const scored = receeMembers.map((m) => {
       const locs = (m.locations || '').toLowerCase();
       let score = 0;
       selRows.forEach((r) => {
@@ -312,11 +415,11 @@ export default function DataTab() {
       return { member: m, score };
     });
     return scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((s) => s.member);
-  }, [selected, members, records]);
+  }, [selected, receeMembers, records]);
 
   function memberOptions() {
     const sug = suggestedMembers.map((m) => m.id);
-    const rest = members.filter((m) => !sug.includes(m.id)).sort((a, b) => a.name.localeCompare(b.name));
+    const rest = receeMembers.filter((m) => !sug.includes(m.id)).sort((a, b) => a.name.localeCompare(b.name));
     return { sug: suggestedMembers, rest };
   }
 
@@ -353,8 +456,8 @@ export default function DataTab() {
   const allVisibleSelected = tableRows.length > 0 && tableRows.every((r) => selected.has(r.id));
   const totalActive = records.filter((r) => r.data?.is_active !== false).length;
 
-  const thStyle = { padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#949494', borderBottom: '1px solid #E7E2D8', whiteSpace: 'nowrap', background: '#FAF9F7' };
-  const tdStyle = { padding: '7px 10px', borderBottom: '1px solid #F0EDE8', fontSize: 12.5, color: '#161616', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+  const thStyle = TH_STYLE;
+  const tdStyle = TD_STYLE;
 
   return (
     <div>
@@ -455,15 +558,16 @@ export default function DataTab() {
           <select
             value={assignMember}
             onChange={(e) => setAssignMember(e.target.value)}
+            disabled={receeMembers.length === 0}
             style={{ padding: '8px 10px', borderRadius: 8, border: '1.5px solid #E7E2D8', fontSize: 12.5, background: '#fff', minWidth: 200 }}
           >
-            <option value="">Assign to…</option>
+            <option value="">{receeMembers.length === 0 ? 'No recee team members' : 'Assign to recee…'}</option>
             {suggestedMembers.length > 0 && <optgroup label="Nearby (match by area/PIN)">{suggestedMembers.map((m) => <option key={m.id} value={m.id}>{m.name}{m.locations ? ` · ${m.locations}` : ''}</option>)}</optgroup>}
-            <optgroup label="All members">
+            <optgroup label="Recee team">
               {memberOptions().rest.map((m) => <option key={m.id} value={m.id}>{m.name}{m.locations ? ` · ${m.locations}` : ''}</option>)}
             </optgroup>
           </select>
-          <button onClick={handleAssign} disabled={busy} style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#F2701D', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={handleAssign} disabled={busy || receeMembers.length === 0} style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: receeMembers.length === 0 ? '#E7E2D8' : '#F2701D', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: receeMembers.length === 0 ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <UserCheck size={14} /> {busy ? 'Working…' : 'Assign'}
           </button>
           <span style={{ height: 22, width: 1, background: '#E7E2D8' }} />
@@ -490,8 +594,8 @@ export default function DataTab() {
         </div>
       ) : (
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E7E2D8', overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto', maxHeight: '70vh', overflowY: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12.5 }} cellPadding="0" cellSpacing="0">
+          <div ref={scrollRef} onScroll={onScroll} style={{ overflowX: 'auto', maxHeight: '70vh', overflowY: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: tableMinWidth, fontSize: 12.5, tableLayout: 'fixed' }} cellPadding="0" cellSpacing="0">
               <thead>
                 <tr>
                   <th style={{ ...thStyle, width: 30 }}>
@@ -499,82 +603,42 @@ export default function DataTab() {
                       {allVisibleSelected ? <CheckSquare size={15} /> : <Square size={15} />}
                     </button>
                   </th>
-                  <th style={thStyle}>#</th>
-                  {isAll && <th style={thStyle}>Catchment</th>}
+                  <th style={{ ...thStyle, width: 44 }}>#</th>
+                  {isAll && <th style={{ ...thStyle, width: 120 }}>Catchment</th>}
                   <th style={thStyle}>Location</th>
-                  <th style={thStyle}>PIN</th>
-                  <th style={thStyle}>Dist</th>
-                  <th style={thStyle}>Source</th>
-                  <th style={thStyle}>Recee</th>
-                  <th style={thStyle}>Assigned</th>
-                  <th style={thStyle}>Edited</th>
+                  <th style={{ ...thStyle, width: 90 }}>PIN</th>
+                  <th style={{ ...thStyle, width: 70 }}>Dist</th>
+                  <th style={{ ...thStyle, width: 90 }}>Source</th>
+                  <th style={{ ...thStyle, width: 100 }}>Recee</th>
+                  <th style={{ ...thStyle, width: 120 }}>Assigned</th>
+                  <th style={{ ...thStyle, width: 130 }}>Edited</th>
                   {allPriceCols.map((p) => (
-                    <th key={p.norm} style={{ ...thStyle, color: '#F2701D' }}>{humanize(p.key)}</th>
+                    <th key={p.norm} style={{ ...thStyle, color: '#F2701D', width: 110 }}>{humanize(p.key)}</th>
                   ))}
-                  <th style={thStyle}>Maps</th>
+                  <th style={{ ...thStyle, width: 60 }}>Maps</th>
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map((r, ri) => {
-                  const d = r.data || {};
-                  const inactive = d.is_active === false;
-                  const prices = pricesOf(d);
-                  const rec = receeBadge(d.recee_status);
-                  const src = SOURCE_STYLE[String(d.source || 'inhouse').toLowerCase().includes('google') ? 'google' : 'inhouse'];
-                  const isSel = selected.has(r.id);
-                  return (
-                    <tr key={r.id} style={{ background: inactive ? '#F7F5F1' : (ri % 2 === 0 ? '#fff' : '#FAF9F7'), opacity: inactive ? 0.6 : 1 }}>
-                      <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        <button onClick={() => toggleSelect(r.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSel ? '#F2701D' : '#949494', padding: 2 }}>
-                          {isSel ? <CheckSquare size={15} /> : <Square size={15} />}
-                        </button>
-                      </td>
-                      <td style={{ ...tdStyle, color: '#949494', fontSize: 11.5 }}>{ri + 1}</td>
-                      {isAll && <td style={tdStyle}><span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: '#F0EDE8', color: '#4A4A4A' }}>{humanize(d.type)}</span></td>}
-                      <td style={{ ...tdStyle, fontWeight: 650, cursor: 'pointer', color: inactive ? '#949494' : '#161616' }} onClick={() => !(editingCell?.recordId === r.id && editingCell?.field === 'name') && startEdit(r.id, 'name', d.name)}>
-                        {editingCell?.recordId === r.id && editingCell?.field === 'name' ? (
-                          <EditableCell inputRef={inputRef} value={editValue} setValue={setEditValue} save={saveEdit} onKey={handleKeyDown} saving={saving} />
-                        ) : d.name || d.apartment || '—'}
-                      </td>
-                      <td style={{ ...tdStyle, cursor: 'pointer' }} onClick={() => !(editingCell?.recordId === r.id && editingCell?.field === 'pin_code') && startEdit(r.id, 'pin_code', d.pin_code)}>
-                        {editingCell?.recordId === r.id && editingCell?.field === 'pin_code' ? (
-                          <EditableCell inputRef={inputRef} value={editValue} setValue={setEditValue} save={saveEdit} onKey={handleKeyDown} saving={saving} />
-                        ) : d.pin_code || '—'}
-                      </td>
-                      <td style={{ ...tdStyle, cursor: 'pointer' }} onClick={() => !(editingCell?.recordId === r.id && editingCell?.field === 'distance_km') && startEdit(r.id, 'distance_km', d.distance_km)}>
-                        {editingCell?.recordId === r.id && editingCell?.field === 'distance_km' ? (
-                          <EditableCell inputRef={inputRef} value={editValue} setValue={setEditValue} save={saveEdit} onKey={handleKeyDown} saving={saving} />
-                        ) : d.distance_km != null && d.distance_km !== '' ? `${d.distance_km} km` : '—'}
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: src.bg, color: src.fg }}>{src.label}</span>
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: rec.bg, color: rec.fg }}>{rec.label}</span>
-                      </td>
-                      <td style={tdStyle} title={d.assigned_by && `Assigned by ${d.assigned_by}`}>{d.assigned_to_name || '—'}</td>
-                      <td style={{ ...tdStyle, fontSize: 11.5, color: '#949494' }} title={d.edited_by && `Edited by ${d.edited_by}`}>
-                        {d.edited_by ? `${d.edited_by}` : ''}
-                        {d.edited_at ? ` ${timeAgo(d.edited_at)}` : ''}
-                      </td>
-{allPriceCols.map((p) => {
-  const found = Object.entries(prices).find(([pk]) => normKey(pk) === p.norm);
-  return (
-    <td key={p.norm} style={{ ...tdStyle, fontWeight: found ? 700 : 400, color: found ? '#C2410C' : '#C7BFB2' }}>
-      {found ? fmtINR(found[1]) : '—'}
-    </td>
-  );
-})}
-                      <td style={tdStyle}>
-                        {d.gmap_link ? (
-                          <a href={d.gmap_link} target="_blank" rel="noopener noreferrer" style={{ color: '#F2701D', display: 'inline-flex', alignItems: 'center' }}>
-                            <ExternalLink size={13} />
-                          </a>
-                        ) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {topPad > 0 && <tr aria-hidden="true"><td colSpan={colCount} style={{ height: topPad, padding: 0, border: 'none' }} /></tr>}
+                {windowRows.map((r, i) => (
+                  <DataRow
+                    key={r.id}
+                    row={r}
+                    meta={metaById.get(r.id)}
+                    index={winStart + i}
+                    isAll={isAll}
+                    priceCols={allPriceCols}
+                    selected={selected.has(r.id)}
+                    editingField={editingCell && editingCell.recordId === r.id ? editingCell.field : null}
+                    saving={saving}
+                    onToggleSelect={toggleSelect}
+                    onStartEdit={startEdit}
+                    onCommitEdit={commitEdit}
+                    onCancelEdit={cancelEdit}
+                    tdStyle={tdStyle}
+                  />
+                ))}
+                {bottomPad > 0 && <tr aria-hidden="true"><td colSpan={colCount} style={{ height: bottomPad, padding: 0, border: 'none' }} /></tr>}
               </tbody>
             </table>
           </div>
@@ -601,14 +665,33 @@ function MenuItem({ label, active, onClick, icon }) {
   );
 }
 
-function EditableCell({ inputRef, value, setValue, save, onKey, saving }) {
+function EditableCell({ initialValue, saving, onCommit, onCancel }) {
+  const [value, setValue] = useState(initialValue ?? '');
+  const ref = useRef(null);
+  const doneRef = useRef(false);
+  useEffect(() => { ref.current?.focus(); ref.current?.select?.(); }, []);
+  function commit() {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    onCommit(value);
+  }
+  function cancel() {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    onCancel();
+  }
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    else if (e.key === 'Tab') { e.preventDefault(); commit(); }
+  }
   return (
     <input
-      ref={inputRef}
+      ref={ref}
       value={value}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={save}
-      onKeyDown={onKey}
+      onBlur={commit}
+      onKeyDown={handleKey}
       disabled={saving}
       style={{
         width: '100%', border: '2px solid #F2701D', borderRadius: 4,
@@ -618,3 +701,70 @@ function EditableCell({ inputRef, value, setValue, save, onKey, saving }) {
     />
   );
 }
+
+// One table row. Memoized, and given only primitives/stable refs, so selecting
+// a row or opening a cell re-renders just that row — not the whole window.
+const DataRow = React.memo(function DataRow({
+  row, meta, index, isAll, priceCols, selected, editingField, saving,
+  onToggleSelect, onStartEdit, onCommitEdit, onCancelEdit, tdStyle,
+}) {
+  const d = row.data || {};
+  const inactive = meta?.inactive;
+  const rec = meta?.rec || { bg: '#EFEBE4', fg: '#949494', label: '—' };
+  const src = meta?.src || SOURCE_STYLE.inhouse;
+  const prices = meta?.prices || {};
+  const zebra = inactive ? '#F7F5F1' : (index % 2 === 0 ? '#fff' : '#FAF9F7');
+
+  const editable = (field, display, value) => (
+    editingField === field ? (
+      <EditableCell initialValue={value} saving={saving} onCommit={(v) => onCommitEdit(row.id, field, v)} onCancel={onCancelEdit} />
+    ) : display
+  );
+
+  return (
+    <tr style={{ height: ROW_H, background: zebra, opacity: inactive ? 0.6 : 1 }}>
+      <td style={{ ...tdStyle, textAlign: 'center' }}>
+        <button onClick={() => onToggleSelect(row.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: selected ? '#F2701D' : '#949494', padding: 2 }}>
+          {selected ? <CheckSquare size={15} /> : <Square size={15} />}
+        </button>
+      </td>
+      <td style={{ ...tdStyle, color: '#949494', fontSize: 11.5 }}>{index + 1}</td>
+      {isAll && <td style={tdStyle}><span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: '#F0EDE8', color: '#4A4A4A' }}>{humanize(d.type)}</span></td>}
+      <td style={{ ...tdStyle, fontWeight: 650, cursor: 'pointer', color: inactive ? '#949494' : '#161616' }} onClick={() => editingField !== 'name' && onStartEdit(row.id, 'name')}>
+        {editable('name', d.name || d.apartment || '—', d.name)}
+      </td>
+      <td style={{ ...tdStyle, cursor: 'pointer' }} onClick={() => editingField !== 'pin_code' && onStartEdit(row.id, 'pin_code')}>
+        {editable('pin_code', d.pin_code || '—', d.pin_code)}
+      </td>
+      <td style={{ ...tdStyle, cursor: 'pointer' }} onClick={() => editingField !== 'distance_km' && onStartEdit(row.id, 'distance_km')}>
+        {editable('distance_km', d.distance_km != null && d.distance_km !== '' ? `${d.distance_km} km` : '—', d.distance_km)}
+      </td>
+      <td style={tdStyle}>
+        <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: src.bg, color: src.fg }}>{src.label}</span>
+      </td>
+      <td style={tdStyle}>
+        <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: rec.bg, color: rec.fg }}>{rec.label}</span>
+      </td>
+      <td style={tdStyle} title={d.assigned_by && `Assigned by ${d.assigned_by}`}>{d.assigned_to_name || '—'}</td>
+      <td style={{ ...tdStyle, fontSize: 11.5, color: '#949494' }} title={d.edited_by && `Edited by ${d.edited_by}`}>
+        {d.edited_by ? `${d.edited_by}` : ''}
+        {d.edited_at ? ` ${timeAgo(d.edited_at)}` : ''}
+      </td>
+      {priceCols.map((p) => {
+        const found = prices[p.norm];
+        return (
+          <td key={p.norm} style={{ ...tdStyle, fontWeight: found != null ? 700 : 400, color: found != null ? '#C2410C' : '#C7BFB2' }}>
+            {found != null ? fmtINR(found) : '—'}
+          </td>
+        );
+      })}
+      <td style={tdStyle}>
+        {d.gmap_link ? (
+          <a href={d.gmap_link} target="_blank" rel="noopener noreferrer" style={{ color: '#F2701D', display: 'inline-flex', alignItems: 'center' }}>
+            <ExternalLink size={13} />
+          </a>
+        ) : '—'}
+      </td>
+    </tr>
+  );
+});

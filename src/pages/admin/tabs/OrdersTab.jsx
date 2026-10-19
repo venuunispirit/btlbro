@@ -118,8 +118,10 @@ export default function OrdersTab({ onNavigate: onChat }) {
         <span style={{ fontSize: 12, color: '#949494' }}>{filtered.length} orders</span>
       </div>
 
-      {/* Orders table */}
-      <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #E7E2D8' }}>
+      {/* Orders table. overflowX (not overflow:hidden) so the wide table
+          scrolls inside its card on a phone instead of forcing the whole page
+          sideways. */}
+      <div style={{ background: '#fff', borderRadius: 12, overflowX: 'auto', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #E7E2D8' }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#949494' }}>Loading orders…</div>
         ) : filtered.length === 0 ? (

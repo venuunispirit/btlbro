@@ -108,7 +108,7 @@ export default function TeamTab() {
           <p style={{ fontSize: 13 }}>Click "Add Member" to invite your first team member</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(430px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(430px, 100%), 1fr))', gap: 16 }}>
           {members.map(m => {
             const roleMeta = ROLES.find(r => r.value === m.role) || ROLES[0];
             const active = m.is_active !== false;
@@ -122,7 +122,7 @@ export default function TeamTab() {
               // mean "this one is active".
               <div key={m.id} style={{
                 position: 'relative', background: '#fff', borderRadius: 14,
-                border: '1px solid #E7E2D8', padding: '18px 20px',
+                border: '1px solid #E7E2D8', padding: '16px 16px',
                 overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 transition: 'border-color 120ms ease, box-shadow 120ms ease',
               }}>
@@ -135,60 +135,61 @@ export default function TeamTab() {
                     boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
                   }} />
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 18, paddingRight: 36 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingRight: 62, minWidth: 0, flexWrap: 'wrap' }}>
                   {/* Avatar */}
                   <div style={{
-                    width: 72, height: 72, borderRadius: '50%', background: '#F2701D',
+                    width: 56, height: 56, borderRadius: '50%', background: '#F2701D',
                     color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 800, fontSize: 28, flexShrink: 0,
+                    fontWeight: 800, fontSize: 20, flexShrink: 0,
                   }}>{m.name?.charAt(0)?.toUpperCase() || '?'}</div>
 
                   {/* Details */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 800, fontSize: 18, color: '#161616' }}>{m.name}</span>
+                  <div style={{ flex: 1, minWidth: 0, minWidth: 130 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, fontSize: 16, color: '#161616' }}>{m.name}</span>
                       <span style={{
-                        fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 999,
+                        fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999,
                         background: roleMeta.color + '18', color: roleMeta.color, textTransform: 'capitalize',
                       }}>{roleMeta.label}</span>
                       {deptOff && (
                         <span style={{
-                          fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 999,
+                          fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999,
                           background: '#FEF3C7', color: '#B45309',
                         }} title="Department disabled — member deactivated">Dept off</span>
                       )}
-                      {m.id === currentUser?.id && <span style={{ fontSize: 11, color: '#949494' }}>(You)</span>}
+                      {m.id === currentUser?.id && <span style={{ fontSize: 10.5, color: '#949494' }}>(You)</span>}
                     </div>
-                    <div style={{ fontSize: 14, color: '#949494', marginTop: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email}</div>
-                    <div style={{ fontSize: 14, color: '#B8AFA6', marginTop: 5, fontStyle: 'italic' }}>{deptName}</div>
+                    <div style={{ fontSize: 11.5, color: '#949494', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{m.email}</div>
+                    <div style={{ fontSize: 11, color: '#B8AFA6', marginTop: 1, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{deptName}</div>
                   </div>
 
                   {/* Controls — every control shares one 48px box so the icon
-                      column and the switch stay on the same centre axis. */}
+                      column and the switch stay on the same centre axis. The row
+                      wraps on a phone so the avatar row does not collide with the
+                      action column. */}
                   {isSuperAdmin && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                       <button onClick={() => setViewing(m.id)} title="View details" style={{
-                        width: 48, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 42, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'none', border: 'none', cursor: 'pointer', color: '#F2701D', padding: 0,
-                      }}><Eye size={22} /></button>
+                      }}><Eye size={18} /></button>
                       <button onClick={() => startEdit(m)} title="Edit member" style={{
-                        width: 48, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 42, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'none', border: 'none', cursor: 'pointer', color: '#F2701D', padding: 0,
-                      }}><Edit3 size={20} /></button>
+                      }}><Edit3 size={16} /></button>
                       <button
                         onClick={() => handleDeactivate(m)}
                         title={active ? 'Deactivate' : 'Reactivate'}
                         role="switch"
                         aria-checked={active}
                         style={{
-                          width: 48, height: 26, borderRadius: 999,
+                          width: 42, height: 22, borderRadius: 999,
                           background: active ? '#F2701D' : '#E7E2D8',
                           border: 'none', cursor: 'pointer', position: 'relative', padding: 0,
                         }}
                       >
                         <span style={{
-                          position: 'absolute', top: 3, left: active ? 25 : 3,
+                          position: 'absolute', top: 1, left: active ? 21 : 1,
                           width: 20, height: 20, borderRadius: '50%', background: '#fff',
                           transition: 'left 0.2s ease', boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
                         }} />
@@ -232,9 +233,8 @@ export default function TeamTab() {
         ];
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={() => setViewing(null)}>
-            <div onClick={e => e.stopPropagation()} style={{
-              background: '#fff', borderRadius: 16, padding: 28, width: 460, maxWidth: '92vw',
+            onClick={() => setViewing(null)}>              <div onClick={e => e.stopPropagation()} style={{
+              background: '#fff', borderRadius: 16, padding: 22, width: 400, maxWidth: '92vw',
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '86vh', overflowY: 'auto',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>

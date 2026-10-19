@@ -524,7 +524,7 @@ const t = {
   // No card. A bordered box inside the modal, wrapped around a table that
   // already has its own header, read as a container inside a container and
   // made the tab look heavier than the content warranted.
-  wrap: { marginTop: 14 },
+  wrap: { marginTop: 14, overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'auto' },
   colRef: { width: '34%' },
   colType: { width: '15%' },

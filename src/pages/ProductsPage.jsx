@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Search, Star, X, Minus, Plus, ShoppingCart, ArrowLeft, ArrowRight,
-  Truck, ShieldCheck, Palette, ChevronDown, Trash2, FileText, Heart,
+  Truck, ShieldCheck, Palette, ChevronDown, Heart,
 } from "lucide-react";
+import { useCart } from "../components/CartContext.jsx";
 import {
   getUser as getSessionUser, getToken, login as apiLogin, register as apiRegister,
-  logout as apiLogout, mergeGuestCart, addToCart as apiAddToCart, removeFromCart as apiRemoveFromCart,
+  logout as apiLogout,
   getWishlist as apiGetWishlist, toggleWishlist as apiToggleWishlist,
 } from "../services/shopClient.js";
 
@@ -213,53 +214,9 @@ function ProductView({ p, onBack, onAdd, wish, onWish }) {
   );
 }
 
-// ---------- Cart drawer ----------
-function CartDrawer({ items, onClose, onRemove, onCheckout }) {
-  const subtotal = items.reduce((s, i) => s + (i.unit_price || 0) * (i.qty || 1), 0);
-  return (
-    <div className="cart-overlay" onClick={onClose}>
-      <div className="cart-drawer" onClick={(e) => e.stopPropagation()}>
-        <div className="cart-head">
-          <h3><ShoppingCart size={17} /> Your Cart ({items.length})</h3>
-          <button onClick={onClose}><X size={18} /></button>
-        </div>
-        {items.length === 0 ? (
-          <div className="cart-empty">Cart is empty. Customize a product to get started.</div>
-        ) : (
-          <>
-            <div className="cart-items">
-              {items.map((i) => (
-                <div key={i.key} className="cart-item">
-                  <span className="cart-item-icon">{i.icon || "📦"}</span>
-                  <div className="cart-item-info">
-                    <div className="cart-item-name">{i.name}</div>
-                    <div className="cart-item-meta">{i.size_label} × {i.qty}</div>
-                  </div>
-                  <div className="cart-item-right">
-                    <div className="cart-item-price">{fmt((i.unit_price || 0) * (i.qty || 1))}</div>
-                    <button className="cart-item-remove" onClick={() => onRemove(i.key)}><Trash2 size={13} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="cart-foot">
-              <div className="cart-subtotal"><span>Subtotal</span><strong>{fmt(subtotal)}</strong></div>
-              <button className="cart-quote-btn" onClick={onCheckout}>
-                <ShoppingCart size={15} /> Checkout — Pay Securely
-              </button>
-              <a className="cart-ghost-btn" href="/customize">
-                <FileText size={14} /> Request a Quote Instead
-              </a>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ---------- Page ----------
 export default function ProductsPage() {
+  const { addItem: addItemToCart, setOpen: setCartOpen, clearCart } = useCart();
   const [openProduct, setOpenProduct] = useState(null);
   const [cat, setCat] = useState("");
   const [use, setUse] = useState("");
@@ -268,11 +225,7 @@ export default function ProductsPage() {
   const [sort, setSort] = useState("popular");
   const [products, setProducts] = useState(FALLBACK_PRODUCTS);
   const [user, setUser] = useState(() => getSessionUser());
-  const [cart, setCart] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("btl_cart") || "[]"); } catch { return []; }
-  });
   const [wishlist, setWishlist] = useState([]);
-  const [cartOpen, setCartOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
@@ -294,9 +247,6 @@ export default function ProductsPage() {
   useEffect(() => {
     if (!getToken()) return;
     apiGetWishlist().then((d) => setWishlist(d.wishlist || [])).catch(() => {});
-    import("../services/shopClient.js").then(({ getCart }) =>
-      getCart().then((d) => { if ((d.cart || []).length > 0) setCart(d.cart); }).catch(() => {})
-    );
   }, []);
 
   useEffect(() => {
@@ -304,11 +254,6 @@ export default function ProductsPage() {
     const t = setTimeout(() => setToast(""), 2200);
     return () => clearTimeout(t);
   }, [toast]);
-
-  const persistLocalCart = (items) => {
-    setCart(items);
-    if (!user) localStorage.setItem("btl_cart", JSON.stringify(items));
-  };
 
   async function handleAuthSubmit(e) {
     e.preventDefault();
@@ -321,12 +266,10 @@ export default function ProductsPage() {
       setUser(data.user);
       setAuthOpen(false);
       setToast(`Welcome, ${data.user.name.split(" ")[0]}!`);
+      window.dispatchEvent(new CustomEvent("btl-auth-change", { detail: { user: data.user } }));
       if (authMode === "login" && data.user?.is_team) {
         window.location.replace("/admin");
         return;
-      }
-      if (cart.length > 0) {
-        try { const resp = await mergeGuestCart(cart); if (resp.cart) setCart(resp.cart); } catch {}
       }
       apiGetWishlist().then((d) => setWishlist(d.wishlist || [])).catch(() => {});
     } catch (err) { setAuthError(err.message); }
@@ -334,7 +277,8 @@ export default function ProductsPage() {
 
   async function handleLogout() {
     try { await apiLogout(); } catch {}
-    setUser(null); setWishlist([]); persistLocalCart([]); setToast("Signed out");
+    setUser(null); setWishlist([]); clearCart(); setToast("Signed out");
+    window.dispatchEvent(new CustomEvent("btl-auth-change", { detail: { user: null } }));
   }
 
   async function handleWish(p) {
@@ -390,38 +334,14 @@ export default function ProductsPage() {
     setTimeout(() => ghost.remove(), 600);
   }, []);
 
-  useEffect(() => {
-    const handler = () => setCartOpen(true);
-    window.addEventListener("btl-open-cart", handler);
-    return () => window.removeEventListener("btl-open-cart", handler);
-  }, []);
-
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("btl-cart-change", { detail: { count: cart.length } }));
-  }, [cart.length]);
-
   const addToCart = async ({ p, size, qty, addons, total, sourceEl }) => {
     const addonNames = Object.keys(addons);
     const key = `${p.id}|${size.label}|${qty}|${addonNames.sort().join(",")}`;
     const item = { key, product_id: p.id, size_label: size.label, qty, addons: addonNames, unit_price: Math.round(total / qty), name: p.name, icon: p.icon };
-    const next = [...cart.filter((i) => i.key !== key), item];
-    persistLocalCart(next);
-    if (user) { try { await apiAddToCart(item); } catch { setToast("Saved locally — will sync on next visit"); } }
+    await addItemToCart(item);
     flyToCart(sourceEl);
     setToast(`${p.name} added to cart`);
     setCartOpen(true);
-  };
-
-  const removeFromCart = async (key) => {
-    const next = cart.filter((i) => i.key !== key);
-    persistLocalCart(next);
-    if (user) { try { await apiRemoveFromCart(key); } catch {} }
-  };
-
-  const goToCheckout = () => {
-    if (!user) { setCartOpen(false); setAuthOpen(true); setAuthMode("login"); setToast("Sign in to checkout"); return; }
-    sessionStorage.setItem("btl_shop_checkout", JSON.stringify({ items: cart }));
-    window.location.href = "/shop/checkout";
   };
 
   return (
@@ -518,7 +438,6 @@ export default function ProductsPage() {
       )}
 
       {toast && <div className="prod-toast">{toast}</div>}
-      {cartOpen && <CartDrawer items={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} onCheckout={goToCheckout} />}
     </div>
   );
 }
@@ -527,11 +446,11 @@ export default function ProductsPage() {
 const PROD_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&family=Zilla+Slab:wght@500;600;700&display=swap');
 
-.auth-overlay { position: fixed; inset: 0; background: rgba(22,22,22,.4); z-index: 4000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.auth-modal { position: relative; background: #fff; border-radius: 18px; padding: 28px; width: 380px; max-width: 100%; display: flex; flex-direction: column; gap: 11px; animation: toastIn .2s ease; }
+.auth-overlay { position: fixed; inset: 0; background: rgba(22,22,22,.4); z-index: 4000; display: flex; align-items: center; justify-content: center; padding: 24px 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.auth-modal { position: relative; background: #fff; border-radius: 18px; padding: 28px; width: 380px; max-width: 100%; display: flex; flex-direction: column; gap: 11px; animation: toastIn .2s ease; margin: auto; }
 .auth-modal h3 { margin: 0; font-family: 'Manrope', sans-serif; font-size: 20px; }
 .auth-sub { margin: 0 0 4px; font-size: 12.5px; color: #949494; }
-.auth-close { position: absolute; top: 14px; right: 14px; border: none; background: none; color: #949494; cursor: pointer; }
+.auth-close { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: none; background: none; color: #949494; cursor: pointer; }
 .auth-input { border: 1.5px solid #E7E2D8; border-radius: 10px; padding: 11px 14px; font-size: 14px; font-family: inherit; outline: none; width: 100%; box-sizing: border-box; }
 .auth-input:focus { border-color: #F2701D; }
 .auth-error { font-size: 12.5px; color: #dc2626; font-weight: 600; }
@@ -627,30 +546,6 @@ const PROD_CSS = `
 .pv-faq-item { border-bottom: 1px solid #E7E2D8; }
 .pv-faq-q { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 4px; border: none; background: none; font-size: 14px; font-weight: 600; text-align: left; }
 .pv-faq-a { padding: 0 4px 15px; color: #656565; font-size: 13.5px; line-height: 1.6; }
-.cart-overlay { position: fixed; inset: 0; background: rgba(22,22,22,.35); z-index: 3000; display: flex; justify-content: flex-end; }
-.cart-drawer { width: 380px; max-width: 92vw; background: #fff; height: 100%; display: flex; flex-direction: column; animation: cartIn .25s ease; }
-@keyframes cartIn { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
-.cart-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid #E7E2D8; }
-.cart-head h3 { margin: 0; font-family: 'Manrope', sans-serif; font-size: 16px; display: flex; align-items: center; gap: 8px; }
-.cart-head button { border: none; background: none; }
-.cart-empty { padding: 48px 24px; text-align: center; color: #949494; font-size: 13.5px; }
-.cart-items { flex: 1; overflow-y: auto; padding: 12px 20px; }
-.cart-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #F0EDE8; }
-.cart-item-icon { font-size: 26px; }
-.cart-item-info { flex: 1; }
-.cart-item-name { font-weight: 600; font-size: 13.5px; }
-.cart-item-meta { font-size: 11.5px; color: #949494; margin-top: 2px; }
-.cart-item-right { text-align: right; }
-.cart-item-price { font-weight: 700; font-size: 13.5px; }
-.cart-item-remove { border: none; background: none; color: #949494; margin-top: 3px; }
-.cart-item-remove:hover { color: #dc2626; }
-.cart-foot { border-top: 1px solid #E7E2D8; padding: 16px 20px 20px; }
-.cart-subtotal { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 12px; }
-.cart-quote-btn { display: flex; justify-content: center; align-items: center; gap: 8px; background: #F2701D; color: #fff; padding: 13px; border-radius: 999px; font-weight: 700; font-size: 14px; text-decoration: none; border: none; cursor: pointer; font-family: inherit; }
-.cart-quote-btn:hover { background: #D8620F; }
-.cart-ghost-btn { display: flex; justify-content: center; align-items: center; gap: 6px; background: none; border: none; color: #656565; font-weight: 600; font-size: 12.5px; text-decoration: none; cursor: pointer; padding: 4px 0; font-family: inherit; }
-.cart-ghost-btn:hover { color: #F2701D; }
-.cart-note { font-size: 11.5px; color: #949494; text-align: center; margin-top: 6px; }
 .prod-toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 3500; background: #161616; color: #fff; font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 999px; box-shadow: 0 8px 22px rgba(0,0,0,.2); animation: toastIn .2s ease; }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (max-width: 640px) { .prod-root { padding: 28px 18px 90px; } .prod-hero h1 { font-size: 26px; } }

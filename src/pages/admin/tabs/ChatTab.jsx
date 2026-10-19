@@ -115,9 +115,9 @@ export default function ChatTab({ target }) {
   });
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 140px)', background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #E7E2D8' }}>
+    <div className="chat-shell" data-has-conv={selectedConv ? 'true' : 'false'} style={{ display: 'flex', height: 'calc(100vh - 168px)', minHeight: 0, background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #E7E2D8' }}>
       {/* Conversation list */}
-      <div style={{ width: 320, borderRight: '1px solid #E7E2D8', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div className="chat-list" style={{ width: 320, borderRight: '1px solid #E7E2D8', display: 'flex', flexDirection: 'column', flexShrink: 0, minHeight: 0 }}>
 <div style={{ padding: 14, borderBottom: '1px solid #E7E2D8' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: search ? 10 : 0 }}>
               <MessageSquare size={18} color="#F2701D" />
@@ -132,7 +132,7 @@ export default function ChatTab({ target }) {
               </div>
             )}
           </div>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {loading ? (
             <div style={{ padding: 30, textAlign: 'center', color: '#949494', fontSize: 12 }}>Loading…</div>
           ) : filteredConvs.length === 0 ? (
@@ -168,8 +168,7 @@ export default function ChatTab({ target }) {
         </div>
       </div>
 
-      {/* Chat area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* Chat area */}        <div className="chat-thread" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' }} data-chat-thread>
         {selectedConv ? (
           <>
             {/* Chat header */}
@@ -194,7 +193,7 @@ export default function ChatTab({ target }) {
             <ConnectionBanner wa={wa} />
 
             {/* Messages */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
               {messages.length === 0 && (
                 <div style={{ textAlign: 'center', color: '#949494', fontSize: 13, marginTop: 40 }}>No messages yet. Start the conversation below.</div>
               )}

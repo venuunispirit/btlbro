@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import Navbar from "./components/Navbar.jsx";
+import { CartProvider, useCart } from "./components/CartContext.jsx";
 import App from "./pages/Landing.jsx";
 import AdminPanel from "./pages/admin/AdminPanel.jsx";
 import CustomerForm from "./pages/CustomerForm.jsx";
@@ -12,18 +13,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import ReceeScreen from "./pages/ReceeScreen.jsx";
 import VendorPortal from "./pages/VendorPortal.jsx";
 import { getUser } from "./services/shopClient.js";
-
-function useGlobalCart() {
-  const [cartCount, setCartCount] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("btl_cart") || "[]").length; } catch { return 0; }
-  });
-  useEffect(() => {
-    const handler = (e) => { setCartCount(e.detail?.count ?? 0); };
-    window.addEventListener("btl-cart-change", handler);
-    return () => window.removeEventListener("btl-cart-change", handler);
-  }, []);
-  return cartCount;
-}
+import "./styles/responsive.css";
 
 function useLocation() {
   const [loc, setLoc] = useState({ path: window.location.pathname, search: window.location.search });
@@ -45,15 +35,11 @@ function Router() {
   const { path, search } = useLocation();
   const urlTab = new URLSearchParams(search).get("tab");
   const [activeTab, setActiveTab] = useState(urlTab || "marketing");
-  const cartCount = useGlobalCart();
+  const { count: cartCount, openCart } = useCart();
 
   useEffect(() => {
     if (urlTab) setActiveTab(urlTab);
   }, [urlTab]);
-
-  const handleCartClick = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("btl-open-cart"));
-  }, []);
 
   // Login redirects by account: recee team → /recee, other staff → /dashboard
   const handleNavigate = useCallback((p) => {
@@ -93,7 +79,7 @@ function Router() {
           onTabChange={setActiveTab}
           page={page}
           cartCount={cartCount}
-          onCartClick={handleCartClick}
+          onCartClick={openCart}
           onNavigate={handleNavigate}
         />
       )}
@@ -108,6 +94,8 @@ function Router() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <Router />
+    <CartProvider>
+      <Router />
+    </CartProvider>
   </React.StrictMode>
 );

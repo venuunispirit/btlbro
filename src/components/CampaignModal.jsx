@@ -69,11 +69,19 @@ function AchievementChart({ points, autoSource }) {
     return () => ro.disconnect();
   }, []);
 
-  const H = Math.max(230, Math.min(420, size.h || 300));
-  const W = Math.max(280, size.w || 560);
-  const pad = { top: 24, right: 26, bottom: 30, left: 62 };
+  const H = Math.max(210, Math.min(420, size.h || 300));
+  const W = Math.max(240, size.w || 560);
+  // Narrow containers (phones) need a tighter axis gutter and smaller tick
+  // text, otherwise the y-labels eat most of the plot area. Desktop keeps the
+  // original geometry untouched.
+  const compact = W < 400;
+  const pad = compact
+    ? { top: 20, right: 12, bottom: 26, left: 40 }
+    : { top: 24, right: 26, bottom: 30, left: 62 };
   const innerW = Math.max(60, W - pad.left - pad.right);
   const innerH = Math.max(60, H - pad.top - pad.bottom);
+  const tickFont = compact ? 8 : 9.5;
+  const titleFont = compact ? 9 : 10;
 
   if (actual.length === 0 && estimated.length === 0) {
     return (
@@ -156,12 +164,12 @@ function AchievementChart({ points, autoSource }) {
   return (
     <div className="cmod-chart" ref={wrapRef}>
       <svg
-        width="100%" height={H} viewBox={`0 0 ${W} ${H}`}
+        width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
         role="img" aria-label="Campaign performance: Actual reach (blue) vs Estimated target (orange)"
         onMouseLeave={() => setHover(null)}
       >
         {/* axis title */}
-        <text x={pad.left - 4} y={11} fontSize="10" fontWeight="600" fill="#64748B">Reach</text>
+        <text x={pad.left - 4} y={11} fontSize={titleFont} fontWeight="600" fill="#64748B">Reach</text>
 
         {/* clean VERTICAL grid lines at every actual data point */}
         {aPts.map((p, i) => (
@@ -170,15 +178,17 @@ function AchievementChart({ points, autoSource }) {
 
         {/* y-axis tick labels (compact: Cr / L / K) */}
         {ticks(maxY).map((v, i) => (
-          <text key={`y${i}`} x={pad.left - 8} y={pad.top + Y(v) + 3} textAnchor="end" fontSize="9.5" fill="#64748B">{formatAxisNumber(v)}</text>
+          <text key={`y${i}`} x={pad.left - 8} y={pad.top + Y(v) + 3} textAnchor="end" fontSize={tickFont} fill="#64748B">{formatAxisNumber(v)}</text>
         ))}
 
-        {/* x labels — dates when available, period labels otherwise */}
+        {/* x labels — dates when available, period labels otherwise.
+            Fewer labels on narrow screens so they never collide. */}
         {xLabelSeries.map((p, i) => {
-          const every = Math.ceil(xLabelSeries.length / 8);
+          const maxLabels = compact ? 4 : 8;
+          const every = Math.max(1, Math.ceil(xLabelSeries.length / maxLabels));
           if (i % every !== 0 && i !== xLabelSeries.length - 1) return null;
           return (
-            <text key={`x${i}`} x={pad.left + X(p.fx)} y={H - 10} textAnchor="middle" fontSize="9.5" fill="#64748B">
+            <text key={`x${i}`} x={pad.left + X(p.fx)} y={H - 10} textAnchor="middle" fontSize={tickFont} fill="#64748B">
               {p.it.date ? formatDate(p.it.date).replace(/ \d{4}$/, '') : (p.it.label || '')}
             </text>
           );
@@ -312,9 +322,6 @@ function InsightsModal({ campaign, onClose }) {
         aria-label={`Campaign insights: ${c.title || 'Campaign'}`}
       >
         <div className="cmod-ins-overlay" aria-hidden="true" />
-        <button ref={closeRef} className="cmod-ins-close" onClick={onClose} aria-label="Close campaign insights">
-          <X size={17} />
-        </button>
 
         <div className="cmod-ins-body">
           <div className="cmod-title-row">
@@ -378,7 +385,7 @@ function InsightsModal({ campaign, onClose }) {
             </div>
           </div>
 
-          <button className="cmod-ins-btn" onClick={onClose}>
+          <button ref={closeRef} className="cmod-ins-btn" onClick={onClose}>
             <X size={15} /> Close Insights
           </button>
         </div>

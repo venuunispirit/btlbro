@@ -1160,6 +1160,14 @@ const CSS = `
 .process-step h5 { font-family: var(--font-display); font-size: 17px; font-weight: 800; margin-top: 8px; }
 .process-step p { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
 .process-line { display: none; }
+/* Five 140px steps cannot share a 320px screen. On a phone the track stacks
+   into a vertical list, each step dividing with its own rule instead of the
+   track's top/bottom pair. */
+@media (max-width: 760px) {
+  .process-track { flex-direction: column; border-top: none; }
+  .process-step { min-width: 0; padding: 20px 2px; border-bottom: 1px solid var(--border); }
+  .process-step:last-child { border-bottom: none; }
+}
 
 .planner-panel { background: var(--warm-bg); border: 1px solid var(--border); border-radius: 6px; padding: 32px; margin-top: 36px; display: flex; flex-direction: column; gap: 28px; }
 .planner-fields { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
@@ -1318,9 +1326,6 @@ const CSS = `
 .cmod-ins { position: relative; width: min(560px, 100%); max-height: 100%; border-radius: 20px; overflow: hidden; background-size: cover; background-position: center; background-color: #101623; border: 1px solid rgba(255,255,255,.22); box-shadow: 0 30px 70px rgba(2,6,18,.55); animation: cmodRise .25s cubic-bezier(.2,.8,.3,1); display: flex; }
 .cmod-ins.cmod-nobg { background: linear-gradient(135deg, #1B2637 0%, #0D1420 100%); }
 .cmod-ins-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,14,24,.8), rgba(10,14,24,.88)); }
-.cmod-ins-backdrop .cmod-ins-close { position: absolute; top: 14px; right: 14px; z-index: 5; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,.35); background: rgba(15,20,32,.55); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease; }
-.cmod-ins-close:hover { background: rgba(15,20,32,.85); }
-.cmod-ins-close:focus-visible { outline: 3px solid #FF7A00; outline-offset: 2px; }
 .cmod-ins-body { position: relative; z-index: 2; flex: 1; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; }
 .cmod-backdrop .cmod-ins-title { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: #fff; }
 .cmod-ins-period { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.85); }
@@ -1342,18 +1347,106 @@ const CSS = `
 .cmod-ins-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(249,115,22,.52); }
 .cmod-ins-btn:focus-visible { outline: 3px solid rgba(249,115,22,.45); outline-offset: 2px; }
 
-/* Responsive */
-@media (max-width: 640px) {
-  .cmod-backdrop { padding: 10px; }
-  .cmod-dialog { border-radius: 18px; height: auto; }
+/* Responsive
+   Desktop (>= 1024px) keeps the side-by-side layout above untouched.
+   <= 768px reflows to a single vertical column. */
+@media (max-width: 768px) {
+  /* No backdrop padding here — the dialog supplies its own 8px gutter via
+     margin, otherwise 8px + (100vw - 16px) + 8px would overflow by 16px. */
+  .cmod-backdrop { padding: 0; }
+  .cmod-dialog {
+    width: calc(100vw - 16px);
+    max-width: 100%;
+    height: auto;
+    max-height: calc(100vh - 16px);
+    margin: 8px;
+    border-radius: 18px;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .cmod-dialog * { min-width: 0; }
+
+  /* Horizontal two-column grid → vertical flow */
+  .cmod-main {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cmod-left, .cmod-right {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .cmod-left { overflow: visible; padding: 20px 16px 6px; }
+  /* Keep the X clear of the campaign title */
+  .cmod-title-row { padding-right: 46px; }
+
   .cmod-bg-overlay { background: linear-gradient(180deg, rgba(10,14,24,.82), rgba(10,14,24,.9)); }
   .cmod-title { font-size: 21px; }
-  .cmod-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-  .cmod-hr-grid { grid-template-columns: 1fr; gap: 7px; }
+
+  /* Close button pinned to the dialog's top-right, above the content */
+  .cmod-backdrop .cmod-close { top: 12px; right: 12px; z-index: 50; }
+
+  /* Analytics panel: static block in the flow, never overlaid */
+  .cmod-right {
+    position: relative;
+    transform: none;
+    left: auto;
+    right: auto;
+    margin: 6px 12px 14px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex: none;
+    padding: 12px 12px 14px;
+  }
+  /* flex:1 would collapse to 0 in an auto-height column — give it a real height */
+  .cmod-chart { flex: none; height: 240px; width: 100%; }
+
+  /* 2 x 2 performance cards, HR pills stacked full width */
+  .cmod-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .cmod-hr-grid { grid-template-columns: 1fr; gap: 8px; }
   .cmod-pill { border-radius: 13px; }
+
+  /* Date chips span the full width; no reserved gap for the close button */
+  .cmod-range { padding-right: 0; }
+  .cmod-range-spacer { flex-basis: 100%; height: 0; }
+
+  /* Button returns to normal flow after the graph */
+  .cmod-backdrop .cmod-btn-insights {
+    position: static;
+    width: 100%;
+    align-self: stretch;
+    justify-content: center;
+    margin-top: 16px;
+  }
+
+  .cmod-tooltip { position: static; transform: none; margin-top: 8px; white-space: normal; }
+
+  /* Insights popup rides along with the parent */
+  .cmod-ins-backdrop { padding: 12px; }
+  .cmod-ins-body { padding: 18px 16px; }
   .cmod-ins-chips { gap: 7px; }
   .cmod-ins-chip-value { font-size: 16px; }
-  .cmod-btn-insights { align-self: stretch; justify-content: center; }
-  .cmod-tooltip { position: static; transform: none; margin-top: 8px; white-space: normal; }
+}
+
+/* Very small phones (320–390px): shrink graph + labels, still no overflow */
+@media (max-width: 390px) {
+  .cmod-chart { height: 210px; }
+  .cmod-left { padding: 18px 12px 4px; }
+  .cmod-right { margin: 6px 10px 12px; padding: 10px 10px 12px; }
+  .cmod-metric-label { font-size: 8px; }
+  .cmod-metric-value { font-size: 13px; }
+  .cmod-pill-label { font-size: 7.5px; }
+  .cmod-pill-value { font-size: 13.5px; }
+  .cmod-range-chip-value { font-size: 11.5px; }
+  .cmod-sec-label { font-size: 11px; }
+  .cmod-backdrop .cmod-btn-insights { font-size: 13px; padding: 12px 16px; }
+  .cmod-legend { font-size: 10px; gap: 9px; }
 }
 `;

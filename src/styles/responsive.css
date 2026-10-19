@@ -1,0 +1,490 @@
+/* ============================================================================
+   BTLbro — shared responsive layer
+   ----------------------------------------------------------------------------
+   The public pages style themselves with inline style objects, which cannot
+   express a media query. Rather than sprinkle `!important` overrides or give
+   every page its own breakpoint copy, the handful of *layout* decisions that
+   genuinely repeat across pages live here as small class hooks, and each
+   component opts in by adding the class name.
+
+   Only layout/responsiveness belongs in this file. Brand colour, type scale and
+   component styling stay with the components.
+   ========================================================================== */
+
+/* ---- Baseline guards ------------------------------------------------------
+ * Cheap, universal, and they stop the classic "one long string wrecks the
+ * layout" failures (emails, UTRs, filenames, API keys shown in the UI). */
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+}
+
+img,
+video {
+  height: auto;
+}
+
+/* A long unbroken token — a UPI id, a transaction reference, a pasted URL —
+ * breaks out of its box by default and drags the page sideways with it. */
+.btl-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ---- Page header (checkout / customize share one) ------------------------ */
+.btl-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #fff;
+  border-bottom: 1px solid #e7e2d8;
+}
+
+.btl-header-inner {
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+  max-width: 1100px;
+}
+
+@media (max-width: 640px) {
+  .btl-header-inner {
+    padding: 12px 16px;
+  }
+}
+
+/* ---- Horizontal container ------------------------------------------------
+ * The pages already cap themselves with max-width; this only supplies the
+ * mobile gutter so content never touches the physical screen edge. */
+.btl-container {
+  margin-inline: auto;
+  padding-inline: 24px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .btl-container {
+    padding-inline: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .btl-container {
+    padding-inline: 14px;
+  }
+}
+
+/* ---- Two-column page bodies ----------------------------------------------
+ * Some pages build this with flex, others with grid, and the display mode is an
+ * inline style we cannot change. Both instructions are emitted: `grid-template-
+ * columns` is inert on a flex container and `flex-direction` is inert on a
+ * grid one, so whichever the page actually uses takes effect. */
+.btl-two-col {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+@media (max-width: 860px) {
+  .btl-two-col {
+    flex-direction: column !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    /* `align-items: flex-start` is correct while the columns sit side by side.
+       Once they stack, it becomes actively harmful: on a *column* flex
+       container, flex-start makes each item size to its own min-content width
+       instead of filling the track, so a card grows to the width of its longest
+       word or fixed-width child and bursts the viewport. Stretch puts it back. */
+    align-items: stretch !important;
+    gap: 20px;
+  }
+  .btl-two-col > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* The order summary column: a fixed 320px sticky rail on desktop, but a
+ * full-width block once stacked — a sticky 320px column on a phone would eat
+ * a third of the viewport and stick over the form.
+ * `top` only has to clear the sticky page header: the progress indicator is
+ * part of the page flow now (it scrolls away), so there is no second sticky bar
+ * to clear. 112px leaves headroom below the 61px header without the rail ever
+ * sliding under it. Only QuickCheckout uses this rail. */
+.btl-side-col {
+  position: sticky;
+  top: 112px;
+}
+
+@media (max-width: 860px) {
+  .btl-side-col {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100%;
+    flex-shrink: 1 !important;
+  }
+}
+
+/* ---- Form grids ----------------------------------------------------------
+ * `minmax(0, 1fr)` rather than `1fr`: a grid track defaults to min-width:auto,
+ * so a wide <select> or a long placeholder refuses to shrink and pushes the
+ * whole card past the viewport. The minmax lets the track actually shrink.
+ * Below 640px the pair becomes one column, which is what a phone form wants. */
+.btl-form-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .btl-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+/* Card padding is generous on desktop and eats a third of a 320px screen on a
+ * phone — 32px of padding each side leaves 256px for the actual field. */
+@media (max-width: 640px) {
+  .btl-form-card {
+    padding: 20px 16px !important;
+    border-radius: 14px;
+  }
+}
+
+.btl-form-grid-3 {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 860px) {
+  .btl-form-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .btl-form-grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Fields must never exceed their track. */
+.btl-form-grid > *,
+.btl-form-grid-3 > * {
+  min-width: 0;
+}
+
+/* ---- Inputs --------------------------------------------------------------
+ * iOS Safari zooms the page when a focused field computes to under 16px. The
+ * desktop density (13–14px) is kept as-is; only the mobile case is raised, and
+ * only because a zoomed-out form is unreadable.
+ *
+ * The first rule is app-wide on purpose: almost every page styles its inputs
+ * with an inline `fontSize` that a class-scoped rule could not reach, and a
+ * form that zooms on focus is broken regardless of which component owns it.
+ * Checkbox/radio/range/file are excluded so purely visual controls keep their
+ * native sizing. */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='image']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ---- Step tracker --------------------------------------------------------
+ * Three numbered steps joined by a connector. On a phone the connector and the
+ * label compete for the same few pixels, so the steps shrink and the labels
+ * stop forcing their natural width. */
+.btl-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.btl-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.btl-step-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .btl-stepper {
+    gap: 6px;
+  }
+  .btl-step {
+    gap: 6px;
+  }
+  .btl-step-label {
+    font-size: 11.5px;
+  }
+}
+
+/* ShopCheckout adds a fixed-width "Products" back link *and* a matching 80px
+ * spacer so the stepper stays centred. With three labelled steps that is
+ * ~440px of fixed content against 272px of usable width at 320px, so the
+ * spacer goes and the stepper shrinks to its numbered dots. The active step is
+ * always colour-coded, so progress stays readable without the words. */
+@media (max-width: 620px) {
+  .btl-step-spacer {
+    display: none !important;
+  }
+}
+
+@media (max-width: 460px) {
+  .btl-page-header .btl-step-label {
+    display: none;
+  }
+  .btl-page-header .btl-step {
+    gap: 0;
+  }
+}
+
+/* QuickCheckout's page structure.
+ *
+ * One container holds BOTH the progress indicator and the two-column checkout
+ * body, so the three steps sit on the same background and the same side gutters
+ * as the cards below. This is what stops the progress looking like its own
+ * detached strip: there is no wrapper background, border or vertical padding
+ * left, so nothing visually separates it from the page.
+ *
+ * Two rules do all the work inside the progress itself:
+ *  - .progress-steps is ONE grid with three equal columns, so the circles and
+ *    their labels are evenly spaced and share a horizontal axis by
+ *    construction. Nothing is positioned per-step.
+ *  - Each circle sits at the CENTRE of its column, so the connectors can be
+ *    derived from that same maths: circle centres fall at 1/6, 3/6 and 5/6 of
+ *    the row, and --pc-dot-size lets the connector stop exactly half a circle
+ *    short of each centre. That is what keeps the line from ever running
+ *    through a circle.
+ */
+/* max-width matches the width the cards already used (1100, border-box), so the
+   cards keep their existing size and the steps line up with their edges for
+   free - both share this one element. */
+.checkout-page-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+/* The progress wrapper is deliberately bare: no background, no border, no
+   padding of its own. It contributes only its bottom margin — that is the whole
+   gap between the steps and the cards, so it stays modest instead of opening a
+   band of empty space. */
+.checkout-progress-wrapper {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0 0 26px;
+}
+
+.checkout-progress {
+  --pc-dot-size: 24px;
+  width: 100%;
+  margin: 0;
+}
+
+.progress-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  position: relative;
+  align-items: start;
+}
+
+.progress-step {
+  position: relative;
+  /* Above the connectors, so a circle always covers the line's end. */
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+}
+
+.step-circle {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.step-circle.active,
+.step-circle.completed {
+  background: #f2701d;
+  color: #fff;
+}
+
+.step-circle.inactive {
+  background: #e7e2d8;
+  color: #949494;
+}
+
+.step-label {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1;
+  color: #949494;
+  white-space: nowrap;
+}
+
+.progress-step.active .step-label {
+  color: #161616;
+  font-weight: 600;
+}
+
+.step-connector {
+  position: absolute;
+  /* (dot height - connector height) / 2, so the line runs through the
+     circles' horizontal axis instead of below them. */
+  top: calc((var(--pc-dot-size) - 3px) / 2);
+  height: 3px;
+  /* One grid column minus one full circle: half a circle is eaten by each end
+     circle, which is exactly the gap the line should span. */
+  width: calc(33.3333% - var(--pc-dot-size));
+  background: #e7e2d8;
+  /* Below the circles, so the line never draws over them. */
+  z-index: 1;
+}
+
+.step-connector.completed {
+  background: #f2701d;
+}
+
+/* Between column 1's centre (1/6) and column 2's centre (3/6). */
+.connector-1 {
+  left: calc(16.6667% + (var(--pc-dot-size) / 2));
+}
+
+/* Between column 2's centre (3/6) and column 3's centre (5/6). */
+.connector-2 {
+  left: calc(50% + (var(--pc-dot-size) / 2));
+}
+
+@media (max-width: 768px) {
+  .checkout-page-container {
+    padding: 20px 14px 32px;
+  }
+
+  .checkout-progress-wrapper {
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .checkout-progress {
+    --pc-dot-size: 22px;
+  }
+
+  .step-circle {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .step-label {
+    font-size: 11px;
+  }
+}
+
+/* ---- Payment / QR block -------------------------------------------------- */
+.btl-qr {
+  width: 240px;
+  height: 240px;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  object-fit: contain;
+}
+
+@media (max-width: 400px) {
+  .btl-qr {
+    width: min(240px, 72vw);
+    height: auto;
+  }
+}
+
+/* ---- Segmented option row (duration, plan pickers) -----------------------
+ * Five equal-width options need ~300px at minimum; below that they spill. On a
+ * phone the row becomes a horizontally scrollable strip, which keeps every
+ * option reachable instead of hiding or truncating them. */
+.btl-seg-scroll {
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 620px) {
+  .btl-seg-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* Room for the focus ring so it is not clipped by the scroll container. */
+    padding: 3px 3px 6px;
+    margin: -3px -3px -6px;
+  }
+
+  .btl-seg-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .btl-seg {
+    flex: 0 0 auto;
+    min-width: 82px;
+    min-height: 44px;
+  }
+}
+
+/* ---- Buttons -------------------------------------------------------------
+ * Side-by-side desktop actions stack on a phone, but only where they would
+ * otherwise be squeezed below a usable size. */
+@media (max-width: 480px) {
+  .btl-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .btl-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ---- Reduced motion ------------------------------------------------------
+ * The landing hero and the splash animate on load. Honour the OS setting
+ * rather than animating regardless. */
+@media (prefers-reduced-motion: reduce) {
+  .btl-page-header,
+  .btl-stepper,
+  .btl-actions {
+    transition: none !important;
+  }
+}

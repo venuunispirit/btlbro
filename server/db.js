@@ -3,6 +3,7 @@ import { JSONFile } from 'lowdb/node';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { EventEmitter } from 'node:events';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, 'data');
@@ -165,6 +166,36 @@ const TERMINAL = new Set(['paid', 'failed', 'cancelled']);
 let notificationDispatcher = null;
 export function setNotificationDispatcher(fn) {
   notificationDispatcher = typeof fn === 'function' ? fn : null;
+}
+
+// Publish/subscribe for payment-row changes, so an open checkout screen can
+// watch a reference and advance the instant the row settles (PayU callback,
+// staff mark-paid, retargeted amount). Keyed by `reference` — the same
+// capability token the public status endpoints accept.
+//
+// Deliberately lives here rather than a service module: db.js has no relative
+// imports, which is what lets the test harness copy it standalone into a temp
+// directory. It is also only useful to a browser that is open right now, so a
+// missed event costs one fallback poll, never correctness.
+const paymentEventBus = new EventEmitter();
+// One listener per open checkout tab; a generous cap keeps a burst of stale
+// listeners from tripping Node's "possible memory leak" warning.
+paymentEventBus.setMaxListeners(200);
+
+function emitPaymentChange(row) {
+  if (!row || !row.reference) return;
+  paymentEventBus.emit('change', row);
+}
+
+/** Watch one reference. Returns an unsubscribe function callers must invoke. */
+export function subscribePayment(reference, listener) {
+  const key = String(reference || '');
+  if (!key) return () => {};
+  const handler = (row) => {
+    if (row.reference === key) listener(row);
+  };
+  paymentEventBus.on('change', handler);
+  return () => paymentEventBus.off('change', handler);
 }
 
 /** A collection request was raised. Distinct from a settlement. */
@@ -590,6 +621,10 @@ function syncParentPayment(rows, apply) {
       if (row.lead_id) syncParentPayment(this.getPaymentsForLead(row.lead_id), (id, patch) => this.updateLead(id, patch));
       if (row.order_id) syncParentPayment(this.getPaymentsForOrder(row.order_id), (id, patch) => this.updateShopOrder(id, patch));
     }
+    // Tell any open checkout tab watching this reference that the row moved.
+    // Fired for every update (not just settlements) so a retargeted amount or
+    // rebuilt QR reaches the customer mid-checkout too.
+    emitPaymentChange(row);
     return row;
   },
 
@@ -1614,6 +1649,28 @@ getUserByEmail(email) {
     return (db.data.records || []).filter((r) => r.data);
   },
 
+  // Find-or-create a single record by its sheet_id, attached to the connected
+  // Google Sheet file. Used to surface a searched location in the Data tab
+  // immediately (the sheet remains the source of truth — the next sync
+  // reconciles this row). Returns the record.
+  upsertRecord(data) {
+    const sheetId = String(data?.sheet_id || '').trim();
+    const found = (db.data.records || []).find(
+      (r) => r.data && String(r.data.sheet_id || '').trim() === sheetId
+    );
+    if (found) {
+      Object.assign(found.data, data);
+      found.updated_at = new Date().toISOString();
+      db.write();
+      return found;
+    }
+    const file = this.getSheetFile();
+    const fileId = file ? file.id : null;
+    const record = this.appendRecord(fileId, data);
+    db.write();
+    return record;
+  },
+
   // A record's source is the single fact the field team cares about: has
   // someone physically been there (inhouse) or are we trusting Google's word
   // (google)? Historically it was written inconsistently ('Inhouse', 'google',
@@ -1680,6 +1737,13 @@ getUserByEmail(email) {
         phone: survey.manager_phone || d.manager_contact?.phone || '',
       };
     }
+
+    // The row and the recee assignment move together: a promoted row is a done
+    // recee, so the Data section stops showing it as pending.
+    patch.recee_status = 'done';
+    patch.recee_status_at = patch.surveyed_at;
+    patch.recee_status_by = byName || survey?.submitted_by || null;
+    patch.needs_recee = false;
 
     return this.updateRecordData(record.id, patch);
   },

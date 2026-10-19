@@ -347,9 +347,13 @@ export function computeDiff(sheetRecords, activeDbRecords, inactiveDbRecords = [
     else unchanged++;
   }
 
-  // In DB but not in the sheet → deactivate (never hard-delete)
+  // In DB but not in the sheet → deactivate (never hard-delete).
+  // CRM-backfill rows added by the Marketing Tool are exempt: they exist in the
+  // DB before the sheet write lands, so deactivating them here would wipe the
+  // row we just surfaced. Once the sheet catches up they match by sheet_id and
+  // are reconciled normally.
   const toDeactivate = activeDbRecords
-    .filter((r) => !seenSheetIds.has(r.data.sheet_id))
+    .filter((r) => !seenSheetIds.has(r.data.sheet_id) && r.data.crm_backfill !== true)
     .map((r) => ({ record: r, sheet_id: r.data.sheet_id, name: r.data.name }));
 
   return { toAdd, toUpdate, toReactivate, unchanged, toDeactivate };

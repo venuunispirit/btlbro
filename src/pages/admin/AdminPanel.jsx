@@ -68,6 +68,26 @@ export default function AdminPanel() {
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem('btl_sidebar_collapsed') === 'true'; } catch { return false; }
   });
+  // Mobile drawer. On a phone the 244px rail cannot sit beside the content — it
+  // becomes an overlay that slides in from the left (see .admin-sidebar in
+  // admin.css). Desktop ignores this entirely and keeps the sticky rail.
+  const [navOpen, setNavOpen] = useState(false);
+
+  // The drawer covers the page, so the page behind it must not scroll away.
+  useEffect(() => {
+    if (!navOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [navOpen]);
+
+  // Escape closes it, matching the drawer pattern users already know.
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') setNavOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
 
   function toggleCollapse() {
     setCollapsed((prev) => {
@@ -190,15 +210,17 @@ export default function AdminPanel() {
   return (
     <FeedbackProvider>
     <div className="admin-root" style={panelStyles.app}>
-      <Sidebar staff={staff} activeTabId={activeTabId} onNavigate={changeTab} onLogout={handleLogout} collapsed={collapsed} onToggleCollapse={toggleCollapse} />
+      <Sidebar staff={staff} activeTabId={activeTabId} onNavigate={changeTab} onLogout={handleLogout} collapsed={collapsed} onToggleCollapse={toggleCollapse} open={navOpen} onClose={() => setNavOpen(false)} />
+      {navOpen && <div className="admin-backdrop" onClick={() => setNavOpen(false)} aria-hidden="true" />}
       <div style={panelStyles.main}>
         <Topbar
           staff={staff}
           activeLabel={NAV_LABELS[activeTabId]}
           subtitle={NAV_SUBTITLES[activeTabId]}
           onNavigate={changeTab}
+          onOpenMenu={() => setNavOpen(true)}
         />
-        <div style={panelStyles.content}>
+        <div className="admin-content" style={panelStyles.content}>
           {renderTab()}
         </div>
       </div>
@@ -211,7 +233,7 @@ export default function AdminPanel() {
 const panelStyles = {
   app: { display: 'flex', minHeight: '100vh' },
   main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
-  content: { padding: 26, flex: 1, background: '#FAF9F7' },
+  content: { padding: 26, flex: 1, background: '#FAF9F7', minWidth: 0 },
 };
 
 // ---- Login styles ----

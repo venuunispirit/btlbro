@@ -144,8 +144,9 @@ export default function DashboardTab({ onNavigate }) {
         </>
       )}
 
-      {/* Sync status + Recent orders */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 18 }}>
+      {/* Sync status + Recent orders. auto-fit so the pair stacks on a phone
+          instead of squeezing two cards into a 320px row. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 18 }}>
         {/* Sync card */}
         <div style={{ background: '#fff', borderRadius: 14, padding: 22, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', border: '1px solid #F1EDE4' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700 }}>Sheet Sync</h3>

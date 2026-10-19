@@ -3,7 +3,7 @@ import { Menu, X, ShoppingCart, User, LogOut, Package, ChevronDown, Eye, EyeOff 
 import { getUser, setSession, clearSession, login as apiLogin, register as apiRegister, logout as apiLogout, me } from "../services/shopClient.js";
 
 const TABS = [
-  { id: "marketing", label: "Marketing Tool" },
+  { id: "marketing", label: "Neighbourhood Marketing Tool" },
   { id: "website", label: "Website" },
   { id: "products", label: "Products" },
 ];
@@ -37,6 +37,12 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
     const handler = (e) => { setUser(e.detail?.user ?? null); };
     window.addEventListener("btl-auth-change", handler);
     return () => window.removeEventListener("btl-auth-change", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => { setAuthTab("signin"); setAuthError(""); setAuthOpen(true); };
+    window.addEventListener("btl-request-auth", handler);
+    return () => window.removeEventListener("btl-request-auth", handler);
   }, []);
 
   useEffect(() => {
@@ -125,11 +131,6 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
       <header className="navbar" id="btl-navbar">
         <div className="navbar-inner">
           <a href="/" className="logo">
-            <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true">
-              <circle cx="15" cy="4" r="2.4" fill="#F2701D" />
-              <circle cx="5" cy="15" r="2.4" fill="#F2701D" />
-              <circle cx="15" cy="26" r="2.4" fill="#F2701D" />
-            </svg>
             <span className="logo-text">
               <span className="logo-word">BTL<span className="logo-orange">bro</span></span>
               <span className="logo-tag">Hyperlocal marketing, simplified.</span>
@@ -161,7 +162,8 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
           </div>
 
           <div className="navbar-right">
-            <button className="navbar-cart-btn" ref={cartIconRef} onClick={onCartClick} aria-label="Open cart">
+            <button className="navbar-cart-btn" ref={cartIconRef}
+              onClick={() => { setMobileOpen(false); onCartClick?.(); }} aria-label="Open cart">
               <ShoppingCart size={20} />
               {cartCount > 0 && <span className="navbar-cart-badge">{cartCount}</span>}
             </button>
@@ -193,15 +195,18 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
                 )}
               </div>
             ) : (
-              <button className="navbar-login-btn" onClick={() => setAuthOpen(true)}>
-                <User size={16} /> Sign In
+              <button className="navbar-login-btn" onClick={() => setAuthOpen(true)} aria-label="Sign in">
+                <User size={16} /> <span className="navbar-login-label">Sign In</span>
               </button>
             )}
-          </div>
 
-          <button className="navbar-burger" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
-            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+            {/* Inside .navbar-right on purpose: as a sibling it inherited
+                .navbar-inner's 20px gap, so the burger sat 24px from the sign-in
+                button while the cart sat 6px from it. Here all three share one gap. */}
+            <button className="navbar-burger" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
         </div>
 
         {mobileOpen && (
@@ -218,9 +223,6 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
                 </button>
               );
             })}
-            <button className="navbar-tab" onClick={() => { onCartClick?.(); setMobileOpen(false); }}>
-              Cart {cartCount > 0 && `(${cartCount})`}
-            </button>
             <div className="navbar-mobile-divider" />
             {user ? (
               <>
@@ -246,11 +248,6 @@ export default function Navbar({ activeTab, onTabChange, page, cartCount = 0, on
             <button className="auth-close" onClick={() => setAuthOpen(false)}><X size={18} /></button>
 
             <div className="auth-brand">
-              <svg width="36" height="36" viewBox="0 0 30 30" fill="none">
-                <circle cx="15" cy="4" r="2.4" fill="#F2701D" />
-                <circle cx="5" cy="15" r="2.4" fill="#F2701D" />
-                <circle cx="15" cy="26" r="2.4" fill="#F2701D" />
-              </svg>
               <div className="auth-brand-text">
                 <span className="auth-brand-name">BTL<span style={{ color: "#F2701D" }}>bro</span></span>
               </div>
@@ -333,7 +330,12 @@ const CSS = `
   box-shadow: 0 1px 0 var(--tborder);
 }
 .navbar a { color: inherit; text-decoration: none; }
-.navbar .navbar-tab, .navbar .navbar-burger, .navbar .navbar-cart-btn, .navbar .navbar-user-btn, .navbar .navbar-dropdown-item { font-family: inherit; cursor: pointer; background: none; border: none; }
+/* :where() contributes 0 specificity, so this reset only has to beat the browser's
+   default button styling. Written as ".navbar .navbar-cart-btn" it scored 0,2,0 and
+   silently beat the 0,1,0 component rules below it, so their background fills never
+   rendered and the cart/user buttons came out transparent. Keep the parts inside
+   :where() so the rules below win on source order alone. */
+.navbar :where(.navbar-tab, .navbar-burger, .navbar-cart-btn, .navbar-user-btn, .navbar-dropdown-item, .navbar-login-btn) { font-family: inherit; cursor: pointer; background: none; border: none; }
 
 .navbar-inner { max-width: var(--tmax-w); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 16px 32px 14px; gap: 20px; }
 @media (max-width: 640px) { .navbar-inner { padding: 14px 18px; } }
@@ -361,8 +363,52 @@ const CSS = `
 .navbar .navbar-tab-active:hover { color: #fff !important; }
 
 .navbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.navbar-burger { display: none; }
-@media (max-width: 980px) { .navbar-tabs, .navbar-right { display: none; } .navbar-burger { display: block; } }
+/* 44px keeps the burger on the recommended minimum tap target. */
+.navbar-burger {
+  display: none;
+  width: 44px; height: 44px; flex-shrink: 0;
+  align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: #F0F0F0; color: var(--tink);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.navbar-burger:hover { background: #E4E0DA; }
+/* Mobile: the tab pill collapses into the burger, and the cart stays visible
+   as a standalone button immediately before it. Sign-in stays in the header too,
+   but shrinks to a bare icon so the row does not crowd. */
+@media (max-width: 980px) {
+  .navbar-tabs { display: none; }
+  .navbar-right { display: flex; margin-left: auto; gap: 6px; }
+  .navbar-user-wrap { display: none; }
+  /* Bare icons on mobile — no filled circle behind them. Prefixed with .navbar
+     because the cart/burger base rules score (0,1,0) and the cart one is
+     declared AFTER this media query, so an unprefixed override would lose on
+     source order. Desktop keeps the cart's circle. */
+  .navbar .navbar-cart-btn,
+  .navbar .navbar-burger { background: none; }
+  /* Keep a light tint on hover/press so a tap still gives feedback now that
+     there is no resting fill. */
+  .navbar .navbar-cart-btn:hover,
+  .navbar .navbar-burger:hover { background: #F4F1EC; }
+  .navbar .navbar-login-btn {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+    border: none;
+    border-radius: 999px;
+    background: none !important;
+    color: var(--tink);
+  }
+  .navbar .navbar-login-btn:hover { background: #F4F1EC !important; }
+  /* Icon-only on mobile: the text label is dropped, not the button. */
+  .navbar-login-label { display: none; }
+  /* No extra margin: the burger now lives inside .navbar-right, so the row's
+     single gap spaces it evenly from the cart and the sign-in icon. */
+  .navbar-burger { display: flex; }
+}
 .navbar-mobile { display: flex; flex-direction: column; gap: 14px; padding: 0 20px 22px; }
 .navbar-mobile .navbar-tab-active { background: var(--torange); color: #fff; }
 .navbar-mobile-divider { border-top: 1px solid var(--tborder); margin: 4px 0; }
@@ -370,7 +416,7 @@ const CSS = `
 .navbar-cart-btn {
   position: relative;
   display: flex; align-items: center; justify-content: center;
-  width: 42px; height: 42px; border-radius: 999px;
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px;
   background: #F0F0F0; color: var(--tink);
   transition: background 0.15s ease, transform 0.15s ease;
 }
@@ -387,7 +433,7 @@ const CSS = `
 
 .navbar-login-btn {
   display: flex; align-items: center; gap: 6px;
-  padding: 9px 20px; border-radius: 999px;
+  padding: 9px 20px; min-height: 44px; border-radius: 999px;
   background: var(--tink) !important; color: #fff;
   font-size: 13.5px; font-weight: 600;
   transition: background 0.15s ease, transform 0.15s ease;
@@ -442,6 +488,11 @@ const CSS = `
   position: fixed; inset: 0; z-index: 9998;
   background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
+  /* The overlay itself scrolls. Without this a tall modal (the register tab on
+     a short phone) is clipped at both ends and the top of the form — including
+     the only close control — is unreachable. */
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 24px 16px;
   animation: fadeIn 0.2s ease;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -450,17 +501,27 @@ const CSS = `
   width: 420px; max-width: 92vw; position: relative;
   box-shadow: 0 25px 80px rgba(0,0,0,0.2), 0 4px 20px rgba(0,0,0,0.08);
   animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
+  /* margin:auto keeps a modal taller than the viewport genuinely scrollable
+     inside a centred flexbox (a plain centred child gets its top cut off). */
+  margin: auto;
 }
 @keyframes modalSlideUp { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .auth-close {
   position: absolute; top: 16px; right: 16px;
-  width: 32px; height: 32px; border-radius: 999px;
+  width: 44px; height: 44px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
-  color: #F2701D; border: 1.5px solid #F2701D; background: none;
-  transition: all 0.15s ease; z-index: 1; cursor: pointer;
+  color: #F2701D; border: 1.5px solid #F2701D; background: #fff;
+  transition: all 0.15s ease; z-index: 2; cursor: pointer;
 }
 .auth-close:hover { background: rgba(242,112,29,0.1); color: #d8620f; border-color: #d8620f; }
+@media (max-width: 480px) {
+  .auth-overlay { padding: 16px 12px; }
+  .auth-brand { padding: 24px 20px 0; }
+  .auth-title, .auth-subtitle { padding-left: 20px; padding-right: 20px; }
+  .auth-tabs { margin-left: 20px; margin-right: 20px; }
+  .auth-form { padding: 0 20px; }
+  .auth-footer { padding: 18px 20px 24px; }
+}
 .auth-brand {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 28px 32px 0;

@@ -28,7 +28,7 @@ const dbSource = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8')
   .replace(`path.join(__dirname, 'data')`, `path.join(__dirname, 'test-data')`);
 fs.writeFileSync(path.join(tmpDir, 'db.js'), dbSource);
 
-for (const f of ['services/upi.js', 'services/payu.js', 'middleware/staffAuth.js', 'routes/upiPayments.js', 'routes/checkout.js']) {
+for (const f of ['services/upi.js', 'services/payu.js', 'middleware/staffAuth.js', 'routes/upiPayments.js', 'routes/checkout.js', 'routes/settings.js']) {
   fs.copyFileSync(path.join(__dirname, f), path.join(tmpDir, f));
 }
 
@@ -80,6 +80,8 @@ app.use(express.json());
 app.use('/api/admin/payments', router);
 const checkoutRouter = (await import(pathToFileURL(path.join(tmpDir, 'routes/checkout.js')))).default;
 app.use('/api/checkout', checkoutRouter);
+const settingsRouter = (await import(pathToFileURL(path.join(tmpDir, 'routes/settings.js')))).default;
+app.use('/api/settings', settingsRouter);
 const server = app.listen(0);
 await new Promise(r => server.once('listening', r));
 const root = `http://127.0.0.1:${server.address().port}`;
@@ -454,6 +456,151 @@ check('a link can be removed', lrClear.payment?.company_id === null, JSON.string
 
 let lrNoPerm = await call('PUT', `/ledger/${rowId}`, { token: tokens.member, body: { company_id: ledgerCo.id } });
 check('a member cannot relink money', lrNoPerm.status === 403, String(lrNoPerm.status));
+
+// == Test 16: changing the booking amount follows OPEN requests ==
+// The amount on a ledger row is a snapshot — but of a price nobody has paid
+// yet when the row is still awaiting. Settings is the single source of truth,
+// so retargeting must move awaiting checkout rows (and their QRs, and their
+// lead snapshots) while leaving settled money and deliberate staff requests
+// exactly as they were.
+console.log('\n== Test 16: a booking-amount change follows open requests ==');
+{
+  // Seed one row of each kind so the filter has something to be right about.
+  const seedLead = dbHelpers.addLead({
+    businessName: 'Retarget Cafe', contactName: 'Ret Raj', phone: '9876543999',
+    status: 'new', source: 'checkout', amountPaid: 1750, bookingAmount: 1750, amountQuoted: 9000,
+  });
+  const awaitingRow = dbHelpers.addPayment({
+    direction: 'in', status: 'awaiting', amount: 1750, currency: 'INR',
+    vpa: 'btlbro@okhdfcbank', counterparty_name: 'Ret Raj',
+    reference: 'btl_in_retgt_open', created_by_name: 'Checkout',
+    intent_uri: 'upi://pay?pa=btlbro@okhdfcbank&am=1750.00&cu=INR&tr=btl_in_retgt_open',
+    rail: 'local', lead_id: seedLead.id,
+  });
+  dbHelpers.updateLead(seedLead.id, {
+    payment_id: awaitingRow.id, payment_reference: awaitingRow.reference, payment_status: 'pending',
+  });
+
+  const paidRow = dbHelpers.addPayment({
+    direction: 'in', status: 'paid', amount: 1750, currency: 'INR',
+    vpa: 'btlbro@okhdfcbank', counterparty_name: 'Settled Sam',
+    reference: 'btl_in_retgt_paid', created_by_name: 'Checkout', rail: 'local',
+    paid_at: new Date().toISOString(),
+  });
+
+  const staffRow = dbHelpers.addPayment({
+    direction: 'in', status: 'awaiting', amount: 555, currency: 'INR',
+    vpa: 'btlbro@okhdfcbank', counterparty_name: 'Deliberate Dave',
+    reference: 'btl_in_retgt_staff', created_by_name: 'Asha Rao', rail: 'local',
+  });
+
+  // Watch the event bus while the retarget runs — this is the same channel a
+  // customer's open checkout tab listens on.
+  const seen = [];
+  const { subscribePayment } = await import(pathToFileURL(path.join(tmpDir, 'db.js')));
+  const off = subscribePayment(awaitingRow.reference, (row) => seen.push(row.amount));
+
+  setBookingAmount(1750);
+  // settings lives at /api/settings, not under the admin-payments base the
+  // `call` helper prefixes, so it is fetched directly with the staff token.
+  const putSettings = (payload) => fetch(`${root}/api/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.super_admin}` },
+    body: JSON.stringify(payload),
+  }).then((x) => x.json());
+
+  const resPut = await putSettings({ payment: { min_booking: 1999 } });
+
+  const rowNow = dbHelpers.getPayments().find((p) => p.id === awaitingRow.id);
+  const paidNow = dbHelpers.getPayments().find((p) => p.id === paidRow.id);
+  const staffNow = dbHelpers.getPayments().find((p) => p.id === staffRow.id);
+  const leadNow = dbHelpers.getLeadById(seedLead.id);
+
+  check('settings save reports how many requests followed', Number(resPut.retargeted) >= 1, String(resPut.retargeted));
+  check('the awaiting checkout row is retargeted', rowNow.amount === 1999, String(rowNow.amount));
+  check('its QR is rebuilt with the new amount',
+    decodeURIComponent(rowNow.intent_uri || '').includes('am=1999.00'),
+    decodeURIComponent(rowNow.intent_uri || ''));
+  check('the settled row is untouched', paidNow.amount === 1750, String(paidNow.amount));
+  check('a deliberate staff request is untouched', staffNow.amount === 555, String(staffNow.amount));
+  check('the lead snapshot follows the new price', leadNow.bookingAmount === 1999 && leadNow.amountPaid === 1999,
+    `${leadNow.bookingAmount}/${leadNow.amountPaid}`);
+  check('the retarget reached open checkout tabs on the event bus',
+    seen.length >= 1 && seen[seen.length - 1] === 1999, JSON.stringify(seen));
+
+  // Saving the same amount again must not churn rows or claim work done.
+  const resAgain = await putSettings({ payment: { min_booking: 1999 } });
+  check('re-saving the same amount retargets nothing', resAgain.retargeted === 0, String(resAgain.retargeted));
+  off();
+}
+
+// == Test 17: the checkout status stream pushes settlements in realtime ==
+// Polling works but only as fast as its slowest tick, and it dies on a fixed
+// ceiling. The stream must open with a snapshot, push the moment the row
+// moves, and close itself once the payment is terminal.
+console.log('\n== Test 17: SSE status stream pushes instead of polls ==');
+{
+  const streamRef = 'btl_in_retgt_open';   // still awaiting from Test 16
+  const abort = new AbortController();
+  const sseRes = await fetch(`${root}/api/checkout/status/stream/${streamRef}`, { signal: abort.signal });
+  check('stream opens as event-stream', sseRes.status === 200
+    && (sseRes.headers.get('content-type') || '').includes('text/event-stream'),
+    `${sseRes.status} ${sseRes.headers.get('content-type')}`);
+
+  const reader = sseRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  async function nextEvent(timeoutMs = 4000) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const idx = buf.indexOf('\n\n');
+      if (idx !== -1) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const dataLine = frame.split('\n').find((l) => l.startsWith('data: '));
+        if (dataLine) return JSON.parse(dataLine.slice(6));
+        continue;                                   // heartbeat comment, skip
+      }
+      const left = deadline - Date.now();
+      if (left <= 0) throw new Error('SSE frame timeout');
+      const result = await Promise.race([
+        reader.read(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('SSE frame timeout')), left)),
+      ]);
+      if (result.done) return null;
+      buf += decoder.decode(result.value, { stream: true });
+    }
+  }
+
+  try {
+    const snap = await nextEvent();
+    check('first frame is a snapshot of the current state', snap?.reference === streamRef && snap?.status === 'awaiting',
+      JSON.stringify(snap));
+    check('the snapshot carries the retargeted amount', snap?.amount === 1999, String(snap?.amount));
+    check('and the QR the customer should be showing', !!snap?.intent_uri, String(snap?.intent_uri));
+
+    // Settle it the way the gateway callback or a staff mark-paid does.
+    const liveId = dbHelpers.getPayments().find((p) => p.reference === streamRef).id;
+    await call('PUT', `/ledger/${liveId}`, { token: mgr, body: { status: 'paid' } });
+
+    const pushed = await nextEvent();
+    check('the settlement is pushed, not waited for', pushed?.status === 'paid' && pushed?.paid === true, JSON.stringify(pushed));
+
+    const after = await nextEvent(2000);
+    check('the stream closes itself once the payment is terminal', after === null, String(after));
+  } catch (err) {
+    check('the stream delivers frames without stalling', false, err.message);
+  } finally {
+    try { abort.abort(); } catch { /* already closed */ }
+  }
+
+  const bad = await fetch(`${root}/api/checkout/status/stream/does-not-exist`);
+  check('unknown reference is a 404, not an open-ended stream', bad.status === 404, String(bad.status));
+  // A stream for an already-settled row still answers, then ends.
+  const doneRes = await fetch(`${root}/api/checkout/status/stream/${streamRef}`);
+  const doneBuf = await new Response(doneRes.body).text();
+  check('an already-paid reference answers with its terminal state', doneBuf.includes('"paid"'), doneBuf.slice(0, 120));
+}
 
 // Cleanup
 server.close();

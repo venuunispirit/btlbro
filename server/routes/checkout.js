@@ -14,7 +14,7 @@
 //      `status: 'completed'` or overwrite `bd_exec_id` on their own lead.
 
 import express from 'express';
-import { dbHelpers } from '../db.js';
+import { dbHelpers, subscribePayment } from '../db.js';
 import { createCollectRequest } from './upiPayments.js';
 
 const router = express.Router();
@@ -240,21 +240,104 @@ function bookingAmount() {
  * Public status poll for a checkout payment. Deliberately narrow: status and
  * amount only, no counterparty details — the reference is the capability.
  */
+function statusPayload(row) {
+  return {
+    reference: row.reference,
+    status: row.status,
+    amount: row.amount,
+    rail: row.rail,
+    // Sent so a customer whose booking amount was retargeted mid-checkout can
+    // re-render the QR with the new amount instead of paying the stale figure.
+    intent_uri: row.intent_uri || '',
+    paid: row.status === 'paid',
+  };
+}
+
+const TERMINAL_PAYMENT = new Set(['paid', 'failed', 'cancelled']);
+
 router.get('/status/:reference', (req, res) => {
   try {
     const reference = str(req.params.reference, 60);
     const row = dbHelpers.getPayments().find(p => p.reference === reference);
     if (!row) return res.status(404).json({ error: 'Unknown payment reference' });
-    res.json({
-      reference: row.reference,
-      status: row.status,
-      amount: row.amount,
-      rail: row.rail,
-      paid: row.status === 'paid',
-    });
+    res.json(statusPayload(row));
   } catch (error) {
     res.status(500).json({ error: 'Failed to read payment status', details: error.message });
   }
+});
+
+/**
+ * Live status stream (Server-Sent Events) for a checkout payment. Same trust
+ * model as the poll above — the reference is the capability — but pushes the
+ * new state the moment the gateway callback or a staff mark-paid settles the
+ * row, so the checkout screen can advance without waiting for a poll tick.
+ *
+ * The stream is self-terminating: it closes on a terminal status, on a hard
+ * lifetime cap, and when the client disconnects. A heartbeat comment keeps
+ * proxies from buffering or dropping the idle connection.
+ */
+router.get('/status/stream/:reference', (req, res) => {
+  const reference = str(req.params.reference, 60);
+  const row = dbHelpers.getPayments().find(p => p.reference === reference);
+  if (!row) return res.status(404).json({ error: 'Unknown payment reference' });
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const send = (payload) => {
+    try {
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    } catch {
+      /* client went away; close() below tears down */
+    }
+  };
+
+  let closed = false;
+  let unsubscribe = () => {};
+  let heartbeat = null;
+  let lifetime = null;
+  function close() {
+    if (closed) return;
+    closed = true;
+    if (heartbeat) clearInterval(heartbeat);
+    if (lifetime) clearTimeout(lifetime);
+    unsubscribe();
+    try {
+      res.end();
+    } catch {
+      /* already ended */
+    }
+  }
+
+  // Snapshot immediately so the client can render before the first change.
+  send(statusPayload(row));
+  // Nothing to stream if it is already settled — hand over and close.
+  if (TERMINAL_PAYMENT.has(row.status)) {
+    return close();
+  }
+
+  unsubscribe = subscribePayment(reference, (updated) => {
+    send(statusPayload(updated));
+    if (TERMINAL_PAYMENT.has(updated.status)) close();
+  });
+
+  // Keep proxies from buffering/dropping the idle connection, and cap the
+  // stream's lifetime so an abandoned tab cannot hold a listener forever.
+  heartbeat = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      /* ignore — close handler cleans up */
+    }
+  }, 15000);
+  lifetime = setTimeout(() => close(), 30 * 60 * 1000);
+
+  req.on('close', close);
+  return undefined;
 });
 
 // --------------------------------------------------------------------- pay --

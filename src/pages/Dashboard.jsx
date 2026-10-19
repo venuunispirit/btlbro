@@ -101,11 +101,6 @@ export default function Dashboard({ onNavigate }) {
               <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
                 <button className="auth-close" onClick={() => setAuthOpen(false)}><X size={18} /></button>
                 <div className="auth-brand">
-                  <svg width="36" height="36" viewBox="0 0 30 30" fill="none">
-                    <circle cx="15" cy="4" r="2.4" fill="#F2701D" />
-                    <circle cx="5" cy="15" r="2.4" fill="#F2701D" />
-                    <circle cx="15" cy="26" r="2.4" fill="#F2701D" />
-                  </svg>
                   <div className="auth-brand-text">
                     <span className="auth-brand-name">BTL<span style={{ color: "#F2701D" }}>bro</span></span>
                   </div>
@@ -356,6 +351,10 @@ const CSS = `
   position: fixed; inset: 0; z-index: 9998;
   background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
+  /* The overlay scrolls so a tall modal (register tab on a short phone) is
+     never clipped with its close button out of reach. */
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 24px 16px;
   animation: fadeIn 0.2s ease;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -364,17 +363,25 @@ const CSS = `
   width: 420px; max-width: 92vw; position: relative;
   box-shadow: 0 25px 80px rgba(0,0,0,0.2), 0 4px 20px rgba(0,0,0,0.08);
   animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
+  margin: auto;
 }
 @keyframes modalSlideUp { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .auth-close {
   position: absolute; top: 16px; right: 16px;
-  width: 32px; height: 32px; border-radius: 999px;
+  width: 44px; height: 44px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
-  color: #F2701D; border: 1.5px solid #F2701D; background: none;
-  transition: all 0.15s ease; z-index: 1; cursor: pointer;
+  color: #F2701D; border: 1.5px solid #F2701D; background: #fff;
+  transition: all 0.15s ease; z-index: 2; cursor: pointer;
 }
 .auth-close:hover { background: rgba(242,112,29,0.1); color: #d8620f; border-color: #d8620f; }
+@media (max-width: 480px) {
+  .auth-overlay { padding: 16px 12px; }
+  .auth-brand { padding: 24px 20px 0; }
+  .auth-title, .auth-subtitle { padding-left: 20px; padding-right: 20px; }
+  .auth-tabs { margin-left: 20px; margin-right: 20px; }
+  .auth-form { padding: 0 20px; }
+  .auth-footer { padding: 18px 20px 24px; }
+}
 .auth-brand {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 28px 32px 0;
@@ -468,6 +475,13 @@ const CSS = `
   background: var(--orange); color: #fff;
   font-size: 15px; font-weight: 600;
   transition: background 0.15s ease;
+  /* 12px padding + 15px line-height lands at 43px, a hair under the 44px
+     touch-target floor. min-height decouples the tap area from the type. */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .dash-auth-btn:hover { background: #d8620f; }
+.dash-auth-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 `;

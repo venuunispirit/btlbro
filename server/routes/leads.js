@@ -134,7 +134,7 @@ router.post('/', (req, res) => {
       contactName: text(b.contactName, 100),
       email: text(b.email, 100),
       phone: text(b.phone, 20),
-      category: text(b.category, 100),
+      category: text(b.category, 300),
       locations: text(b.locations, 20),
       radius: text(b.radius, 20),
       pincode: text(b.pincode, 100),

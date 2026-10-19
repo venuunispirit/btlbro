@@ -3,7 +3,7 @@ import {
   LayoutDashboard, CreditCard, MapPin, Upload, FileSpreadsheet,
   BarChart3, Settings as SettingsIcon, Users, Palette, Table2, LogOut,
   Shield, Globe, Target, MessageSquare, Layers, Camera, Wallet,
-  PanelLeftClose, PanelLeftOpen, Building2, Truck,
+  PanelLeftClose, PanelLeftOpen, Building2, Truck, X,
 } from 'lucide-react';
 
 const ROLES = {
@@ -21,7 +21,7 @@ const ROLES = {
 const SIDEBAR_W = 244;
 const SIDEBAR_COLLAPSED_W = 64;
 
-export default function Sidebar({ staff, activeTabId, onNavigate, onLogout, collapsed, onToggleCollapse }) {
+export default function Sidebar({ staff, activeTabId, onNavigate, onLogout, collapsed, onToggleCollapse, open, onClose }) {
   const role = staff?.role || 'member';
   const roleMeta = ROLES[role] || ROLES.member;
   const isCollapsed = !!collapsed;
@@ -52,39 +52,48 @@ export default function Sidebar({ staff, activeTabId, onNavigate, onLogout, coll
     { id: 'settings', label: 'Settings', icon: SettingsIcon, min: 3 },
   ].filter((n) => can(n.min) || (n.also || []).includes(role));
 
-  const W = isCollapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_W;
+  // On narrow screens the drawer is a full overlay, so it always renders its
+  // labels even if the desktop collapse preference is on. `open` is only ever
+  // true on a phone (the desktop rail is never a drawer), so this changes
+  // nothing on desktop.
+  const mini = isCollapsed && !open;
+  const W = mini ? SIDEBAR_COLLAPSED_W : SIDEBAR_W;
 
   return (
-    <aside style={{ ...styles.sidebar, width: W }}>
+    <aside className="admin-sidebar" data-open={open ? 'true' : 'false'} style={{ ...styles.sidebar, width: W, height: '100dvh', flexShrink: 0 }}>
       {/* Top: Brand + Collapse toggle */}
       <div style={styles.topRow}>
-        <div style={{ ...styles.brand, justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+        <div style={{ ...styles.brand, justifyContent: mini ? 'center' : 'flex-start' }}>
           <span style={styles.brandMark}>B</span>
-          {!isCollapsed && (
+          {!mini && (
             <div>
               <div style={styles.brandName}>BTL<span style={{ color: '#F2701D' }}>bro</span></div>
               <div style={styles.brandTag}>Admin</div>
             </div>
           )}
         </div>
-        {!isCollapsed && (
-          <button onClick={onToggleCollapse} style={styles.collapseBtn} title="Collapse sidebar">
+        {!mini && (
+          <button className="admin-collapse-btn" onClick={onToggleCollapse} style={styles.collapseBtn} title="Collapse sidebar">
             <PanelLeftClose size={18} />
           </button>
         )}
       </div>
 
+      {/* Drawer-only close. The desktop sidebar collapses in place, so it has no
+          dismissal control — on mobile it covers the page and needs one. */}
+      {open && <button className="admin-sidebar-close" onClick={onClose} title="Close menu" aria-label="Close menu" />}
+
       {/* Expanded collapse button when collapsed — centred below brand */}
-      {isCollapsed && (
-        <div style={styles.collapsedToggleWrap}>
-          <button onClick={onToggleCollapse} style={styles.collapseBtnCentered} title="Expand sidebar">
+      {isCollapsed && !open && (
+        <div className="collapsed-toggle-wrap">
+          <button className="admin-collapse-btn" onClick={onToggleCollapse} style={styles.collapseBtnCentered} title="Expand sidebar">
             <PanelLeftOpen size={18} />
           </button>
         </div>
       )}
 
       {/* Staff card — hidden when collapsed */}
-      {!isCollapsed && (
+      {!mini && (
         <div style={styles.staffCard}>
           <div style={styles.staffAvatar}>{staff.name?.charAt(0).toUpperCase() || 'U'}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -109,17 +118,19 @@ export default function Sidebar({ staff, activeTabId, onNavigate, onLogout, coll
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
-              title={isCollapsed ? item.label : undefined}
+              className="admin-nav-item"
+              onClick={() => { onNavigate(item.id); onClose?.(); }}
+              title={mini ? item.label : undefined}
+              aria-current={isActive ? 'page' : undefined}
               style={{
                 ...styles.navItem,
-                justifyContent: isCollapsed ? 'center' : 'flex-start',
-                padding: isCollapsed ? '11px 0' : '11px 12px',
+                justifyContent: mini ? 'center' : 'flex-start',
+                padding: mini ? '11px 0' : '11px 12px',
                 ...(isActive ? styles.navItemActive : {}),
               }}
             >
               <Icon size={17} style={{ flexShrink: 0 }} />
-              {!isCollapsed && <span>{item.label}</span>}
+              {!mini && <span>{item.label}</span>}
             </button>
           );
         })}
@@ -127,7 +138,7 @@ export default function Sidebar({ staff, activeTabId, onNavigate, onLogout, coll
 
       {/* Bottom section: role info + sign out */}
       <div style={styles.bottomSection}>
-        {!isCollapsed && (
+        {!mini && (
           <div style={styles.sidebarFoot}>
             <Shield size={14} style={{ marginRight: 6, opacity: 0.7 }} />
             Role-based access · {roleMeta.label}
@@ -135,11 +146,11 @@ export default function Sidebar({ staff, activeTabId, onNavigate, onLogout, coll
         )}
         <button
           onClick={onLogout}
-          style={{ ...styles.logoutBtn, justifyContent: isCollapsed ? 'center' : 'flex-start' }}
+          style={{ ...styles.logoutBtn, justifyContent: mini ? 'center' : 'flex-start' }}
           title="Sign out"
         >
           <LogOut size={17} style={{ flexShrink: 0 }} />
-          {!isCollapsed && <span style={{ marginLeft: 10, fontSize: 13.5, fontWeight: 500 }}>Sign out</span>}
+          {!mini && <span style={{ marginLeft: 10, fontSize: 13.5, fontWeight: 500 }}>Sign out</span>}
         </button>
       </div>
     </aside>
@@ -150,7 +161,6 @@ const styles = {
   sidebar: {
     background: '#161616', color: '#EDEDED',
     display: 'flex', flexDirection: 'column', flexShrink: 0,
-    position: 'sticky', top: 0, height: '100vh',
     transition: 'width 0.2s ease',
     overflow: 'hidden',
   },

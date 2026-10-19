@@ -56,25 +56,36 @@ export default function SiteSurveysTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [assignId, setAssignId] = useState(null);
 
-  async function load() {
-    setLoading(true);
-    setError('');
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
+    if (!silent) setError('');
     try {
       const [res, teamRes] = await Promise.allSettled([api('/api/recee/surveys'), getTeam()]);
       if (res.status === 'fulfilled') {
         setSurveys(res.value.surveys || []);
         setCatalog(res.value.service_catalog || []);
+        if (silent) setError('');
       } else {
-        setError(res.reason?.message || 'Failed to load surveys');
+        if (!silent) setError(res.reason?.message || 'Failed to load surveys');
       }
       if (teamRes.status === 'fulfilled') setTeam(teamRes.value.members || []);
     } catch (err) {
-      setError(err.message || 'Failed to load');
+      if (!silent) setError(err.message || 'Failed to load');
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
+
+  // Keep the counts current when a manager assigns in the Data tab, without a
+  // manual Refresh. Skip while the tab is hidden.
+  useEffect(() => {
+    const poll = setInterval(() => { if (!document.hidden) load(true); }, 30000);
+    const onFocus = () => load(true);
+    window.addEventListener('focus', onFocus);
+    return () => { clearInterval(poll); window.removeEventListener('focus', onFocus); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stats = useMemo(() => {
     const byStatus = { new: 0, assigned: 0, in_progress: 0, done: 0 };
@@ -176,7 +187,7 @@ export default function SiteSurveysTab() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={load} style={ghostBtn}><RefreshCw size={14} /> Refresh</button>
+          <button onClick={() => load()} style={ghostBtn}><RefreshCw size={14} /> Refresh</button>
           {canManage && (
             <button onClick={() => setShowCreate(true)} style={primaryBtn}>
               <Plus size={15} /> New request

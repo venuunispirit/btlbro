@@ -853,7 +853,7 @@ const GoogleDriveTab = () => {
             </div>
 
             {/* Body */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px" }}>
+            <div style={{ flex: 1, overflow: "auto", padding: "16px 20px 20px" }}>
               {historyTab === "history" ? (
                 syncHistory.length > 0 ? (
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>

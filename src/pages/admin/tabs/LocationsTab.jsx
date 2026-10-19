@@ -269,7 +269,7 @@ export default function LocationsTab() {
           <p style={{ fontSize: 13, marginTop: 4 }}>{search ? 'Try a different search.' : 'Sync from Google Sheet — every tab becomes a catchment card automatically.'}</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))', gap: 14 }}>
           {filtered.map((c) => {
             const color = PALETTE[Math.abs(normKey(c.type).length + c.type.length) % PALETTE.length];
             return (

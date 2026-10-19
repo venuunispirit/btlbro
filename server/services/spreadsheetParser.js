@@ -221,13 +221,67 @@ export function parseWorkbook(buffer) {
   for (const tabName of wb.SheetNames) {
     const sheet = wb.Sheets[tabName];
     if (!sheet) continue;
+    const lowerTab = tabName.toLowerCase().trim();
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+    if (!rows.length) continue;
+
+    // Parse CRM Backfill tab (appended via backfill) as records so they
+    // appear in the Data tab after sync.
+    if (lowerTab === 'crm backfill') {
+      const headers = (rows[0] || []).map(cellText);
+      const hmap = {};
+      headers.forEach((h, idx) => {
+        const t = h.toLowerCase();
+        if (t === 'name') hmap.name = idx;
+        else if (t === 'type') hmap.type = idx;
+        else if (t === 'lat') hmap.lat = idx;
+        else if (t === 'lng' || t === 'long' || t === 'longitude') hmap.lng = idx;
+        else if (t.includes('gmap') || (t.includes('map') && t.includes('link'))) hmap.gmap = idx;
+        else if (t === 'source') hmap.source = idx;
+      });
+      let count = 0;
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i] || [];
+        const name = cellText(r[hmap.name]);
+        if (!name) continue;
+        const type = cellText(r[hmap.type]) || 'searched';
+        const lat = parseFloat(r[hmap.lat]) || 0;
+        const lng = parseFloat(r[hmap.lng]) || 0;
+        const gmap = hmap.gmap !== undefined ? cellText(r[hmap.gmap]) : '';
+        const rawSource = hmap.source !== undefined ? cellText(r[hmap.source]).toLowerCase() : '';
+        const source = rawSource.includes('google') ? 'google' : (rawSource || 'from google');
+        records.push({
+          source_row: i + 1,
+          sheet_id: `${type} | ${name}`,
+          name,
+          source,
+          type,
+          tab_name: tabName,
+          sl_no: '',
+          pin_code: '',
+          has_pin_column: false,
+          distance_km: 0,
+          has_distance_column: false,
+          lat,
+          lng,
+          gmap_link: gmap,
+          gmap_query: '',
+          services: {},
+        });
+        count++;
+      }
+      tabs.push({ tab: tabName, records: count, services: [] });
+      console.log(`[Parse] Tab "${tabName}": ${count} places (CRM backfill)`);
+      continue;
+    }
+
     // Backfill target tab (and any future system tabs) are not catchments
-    if (SKIP_TAB_NAMES.includes(tabName.toLowerCase().trim())) {
+    if (SKIP_TAB_NAMES.includes(lowerTab)) {
       tabs.push({ tab: tabName, records: 0, skipped: true, reason: 'backfill tab' });
       continue;
     }
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
-    if (!rows.length) continue;
+    const rows2 = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+    if (!rows2.length) continue;
 
     const row0 = (rows[0] || []).map(cellText);
     const row1 = (rows[1] || []).map(cellText);

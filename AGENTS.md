@@ -38,8 +38,16 @@ sheet data) → per-place/per-service selection → handoff to checkout.
 - Reads: `GET /api/admin/google-drive/files`, `GET .../data/{fileId}?limit=1000`; search geocoded via `/api/places/geocode`.
 - Google Places integration: suggestions (`/api/places/autocomplete`), search
   geocoding (`/api/places/geocode`), and **Nearby** places (`/api/places/nearby`)
-  merged into the POI list. Nearby places (not in our sheet) render as muted
-  "On Request" rows/markers — shown visually but **never bookable**/selectable.
+  merged into the POI list. Nearby places (not in our sheet) are marked
+  `onRequest` and **are selectable** — they flow to checkout tagged
+  `source: 'from google'` (price shows "On request").
+- **The searched centre point is itself a selectable place.** A synthetic POI
+  (`id: 'searched_center'`, `type: 'your_location'`, `isCenter: true`) is
+  prepended to `pois` so the user can buy services for the location they
+  searched. It is `onRequest`, always passes the catchment filter (map + list),
+  renders as the centre dot (skipped in the shape-marker loop and legend), and
+  borrows `serviceColumns`/`columnsForPoi`. Its selection is cleared whenever
+  the search point changes (`clearCenterSelection`).
 - State persisted in `sessionStorage` keys prefixed `mt_`; writes `btl_checkout_data` + `btl_checkout_pincode` for `QuickCheckout`.
 - Dedupes records by type+name, Haversine distance filter, Excel/CSV export.
 
@@ -112,6 +120,8 @@ Mounts (CORS allows localhost:5173/3000, JSON body):
 - `/api/admin` — `adminAuth` → sheetSync.js, plus status
 - `/api/orders` — orders.js (no auth)
 - `/api/settings` — settings.js (no auth)
+- `/api/recee` — recee.js (staff) — site surveys: create request → assign to a
+  recee exec → capture (geo/photos/prices) → verify within 200m → promote the row.
 - `/api/places` — places.js (no auth) — Google Places proxies for the MarketingTool, key in `server/.env` `GOOGLE_MAPS_API_KEY`, never exposed to browser:
   - `GET /autocomplete?input=` — Places (New) Autocomplete suggestions (biased to India)
   - `GET /geocode?input=` — places/PIN query → `{lat,lng}` (replaces Nominatim)
@@ -212,3 +222,16 @@ path; otherwise demo mode with generated sample data.
 - CSV uploads in AdminPanel are **not persisted** server-side (in-memory only);
   only Drive/sheet synced data and orders persist.
 - Checkout/form → orders; admin modifies order status via PUT.
+
+## Recee / site surveys — Data assignment IS the recee assignment
+
+The Data tab (`DataTab.jsx` → `POST /api/admin/records/assign`) is where a recee
+manager assigns a location to a recee. That call does **both**:
+  1. stamps the `records` row (`assigned_to/_name`, `recee_status='pending'`), and
+  2. creates (or re-points) a matching `site_surveys` request so it appears on
+     that recee's screen.
+The two collections are otherwise separate — the recee screen reads only
+`site_surveys`, so without step 2 a Data-tab assignment would never reach them.
+Only `recee`/`recee_manager` assignees get a request (nobody else can action it).
+Completing a survey (`applySurveyToRecord`) flips the row's `recee_status` to
+`done` and `needs_recee=false`, so the Data tab stops showing it pending.

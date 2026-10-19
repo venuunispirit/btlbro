@@ -176,7 +176,7 @@ export default function ShopCheckout() {
           <a href="/products" style={styles.primaryBtn}>Continue Shopping</a>
         </div>
       ) : (
-        <div style={styles.twoCol}>
+        <div className="btl-container btl-two-col" style={styles.twoCol}>
           {/* LEFT: step content */}
           <div style={styles.left}>
             {step === 1 && (
@@ -203,7 +203,7 @@ export default function ShopCheckout() {
                 <h3 style={styles.cardTitle}><MapPin size={16} /> Delivery Address</h3>
                 <input style={styles.input} placeholder="Address line" required value={address.line1}
                   onChange={(e) => setAddress({ ...address, line1: e.target.value })} />
-                <div style={styles.row}>
+                <div className="btl-form-grid">
                   <input style={styles.input} placeholder="City" required value={address.city}
                     onChange={(e) => setAddress({ ...address, city: e.target.value })} />
                   <input style={styles.input} placeholder="PIN code" required value={address.pincode}
@@ -262,20 +262,20 @@ export default function ShopCheckout() {
 function Header({ step }) {
   const steps = ["Account", "Address", "Payment"];
   return (
-    <header style={styles.header}>
-      <div style={styles.headerInner}>
+    <header className="btl-page-header" style={styles.header}>
+      <div className="btl-header-inner" style={styles.headerInner}>
         <a href="/products" style={styles.back}><ArrowLeft size={15} /> Products</a>
-        <div style={styles.steps}>
+        <div className="btl-stepper" style={styles.steps}>
           {steps.map((s, i) => (
-            <div key={s} style={{ display: "flex", alignItems: "center", gap: 6, opacity: step >= i + 1 ? 1 : 0.4 }}>
+            <div key={s} className="btl-step" style={{ display: "flex", alignItems: "center", gap: 6, opacity: step >= i + 1 ? 1 : 0.4 }}>
               <span style={{ ...styles.stepDot, background: step > i + 1 || (step > i && i === 2) ? "#16a34a" : step >= i + 1 ? "#F2701D" : "#E7E2D8", color: step >= i + 1 ? "#fff" : "#656565" }}>
                 {step > i + 1 ? "✓" : i + 1}
               </span>
-              <span style={{ fontSize: 12.5, fontWeight: 600 }}>{s}</span>
+              <span className="btl-step-label" style={{ fontSize: 12.5, fontWeight: 600 }}>{s}</span>
             </div>
           ))}
         </div>
-        <div style={{ width: 80 }} />
+        <div className="btl-step-spacer" />
       </div>
     </header>
   );
@@ -284,11 +284,11 @@ function Header({ step }) {
 const styles = {
   page: { minHeight: "100vh", background: "#FAF9F7", fontFamily: "'Inter', sans-serif", color: "#161616" },
   header: { background: "#fff", borderBottom: "1px solid #E7E2D8", padding: "14px 0" },
-  headerInner: { maxWidth: 1080, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" },
-  back: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600, color: "#656565", textDecoration: "none", width: 80 },
-  steps: { display: "flex", gap: 18 },
-  stepDot: { width: 24, height: 24, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11.5, fontWeight: 700 },
-  twoCol: { maxWidth: 1080, margin: "32px auto", padding: "0 24px", display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 24, alignItems: "start" },
+  headerInner: { maxWidth: 1080, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  back: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600, color: "#656565", textDecoration: "none", width: 80, flexShrink: 0 },
+  steps: { display: "flex", gap: 18, minWidth: 0 },
+  stepDot: { width: 24, height: 24, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11.5, fontWeight: 700, flexShrink: 0 },
+  twoCol: { maxWidth: 1080, margin: "32px auto", display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 24, alignItems: "start" },
   left: { display: "flex", flexDirection: "column", gap: 16 },
   card: { background: "#fff", border: "1px solid #E7E2D8", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 12 },
   cardTitle: { margin: 0, fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 },

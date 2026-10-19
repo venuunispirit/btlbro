@@ -266,8 +266,9 @@ export default function LeadsTab({ onNavigate }) {
         <span style={{ fontSize: 12, color: '#949494' }}>{filtered.length} leads</span>
       </div>
 
-      {/* Leads table */}
-      <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #E7E2D8' }}>
+      {/* Leads table. overflowX so the wide table scrolls inside its own card
+          on a phone rather than dragging the page sideways. */}
+      <div style={{ background: '#fff', borderRadius: 12, overflowX: 'auto', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #E7E2D8' }}>
         {loading ? (
           <div style={loadStyle}>Loading leads…</div>
         ) : filtered.length === 0 ? (
@@ -402,6 +403,7 @@ export default function LeadsTab({ onNavigate }) {
       {detailLead && (
         <div style={scrim} onClick={() => setExpanded(null)}>
           <div
+            className="lead-sheet"
             style={sheet}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
@@ -411,12 +413,12 @@ export default function LeadsTab({ onNavigate }) {
             {/* Close belongs to the whole modal, not the rail. It used to sit in
                 the rail's top-right corner, which read as "closes this panel"
                 and left the tab area looking like it had no dismiss control. */}
-            <button onClick={() => setExpanded(null)} style={sheetClose} aria-label="Close lead">
+            <button className="lead-sheet-close" onClick={() => setExpanded(null)} style={sheetClose} aria-label="Close lead">
               <X size={16} />
             </button>
-            <div style={sheetLayout}>
+            <div className="lead-sheet-layout" style={sheetLayout}>
               {/* ---- identity rail ---- */}
-              <aside style={rail}>
+              <aside className="lead-sheet-rail" style={rail}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: '#C2410C', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   Lead #{detailLead.id}
                 </div>
@@ -554,8 +556,8 @@ export default function LeadsTab({ onNavigate }) {
               </aside>
 
               {/* ---- working area ---- */}
-              <main style={workArea}>
-                <div style={tabBar}>
+              <main className="lead-sheet-work" style={workArea}>
+                <div className="lead-sheet-tabs" style={tabBar}>
                   {[
                     ['money', 'Payment Logs'],
                     ['notes', `Notes${detailLead.notes?.length ? ` (${detailLead.notes.length})` : ''}`],
@@ -846,10 +848,10 @@ const tabOn = {
 const workBody = { padding: '20px', overflowY: 'auto', flex: 1, minHeight: 0 };
 
 // Notes in three columns — a single column turns ten notes into a scroll hunt.
-const noteCols = { columns: '3 240px', columnGap: 12 };
+const noteCols = { columns: '3 180px', columnGap: 10 };
 const noteCard = {
   breakInside: 'avoid', background: '#FAF9F7', border: '1px solid #E7E2D8',
-  borderRadius: 10, padding: '10px 12px', marginBottom: 10,
+  borderRadius: 10, padding: '8px 10px', marginBottom: 8,
 };
 const activityRow = { display: 'flex', gap: 10, padding: '10px 0', borderBottom: '1px solid #F1EDE4' };
 const activityDot = { width: 7, height: 7, borderRadius: 999, background: '#F2701D', marginTop: 5, flexShrink: 0 };

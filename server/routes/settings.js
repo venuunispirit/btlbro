@@ -14,6 +14,7 @@
 import express from 'express';
 import { dbHelpers } from '../db.js';
 import { optionalStaff, requireSuperAdmin } from '../middleware/staffAuth.js';
+import { retargetAwaitingBookingPayments } from './upiPayments.js';
 
 const router = express.Router();
 
@@ -54,10 +55,14 @@ router.get('/', optionalStaff, (req, res) => {
 // This writes live prices and gateway credentials, so an unauthenticated
 // write here would let anyone repoint the booking amount or swap the payout
 // account.
-router.put('/', requireSuperAdmin, (req, res) => {
+router.put('/', requireSuperAdmin, async (req, res) => {
   try {
     const body = req.body || {};
     let settings;
+
+    // Read the booking amount before the write so a change to it can be
+    // pushed onto the open requests that carry the old figure.
+    const prevBooking = Number(dbHelpers.getSettings()?.payment?.min_booking);
 
     // Nested sub-settings, or flat legacy keys. `upi`/`payu` must be listed
     // here too: the legacy branch below is a 2-key allowlist, so a body
@@ -77,7 +82,26 @@ router.put('/', requireSuperAdmin, (req, res) => {
     } else {
       settings = dbHelpers.updateSettings(body);
     }
-    res.json({ success: true, settings });
+
+    // The booking amount is baked into every open checkout request and its QR.
+    // Nobody has paid those yet, so they follow the new price — otherwise the
+    // ledger, the lead and the QR on the customer's screen disagree with this
+    // page while looking perfectly current.
+    let retargeted = 0;
+    const nextBooking = Number(settings?.payment?.min_booking);
+    const bookingChanged =
+      Number.isFinite(nextBooking) && nextBooking > 0 && nextBooking !== prevBooking;
+    if (bookingChanged) {
+      const configured = String(process.env.PAYU_CALLBACK_BASE || '').trim();
+      const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+      const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').trim();
+      const callbackBase = configured
+        ? configured.replace(/\/+$/, '')
+        : (host ? `${proto}://${host}` : '');
+      retargeted = await retargetAwaitingBookingPayments({ newAmount: nextBooking, callbackBase });
+    }
+
+    res.json({ success: true, settings, retargeted });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update settings', details: error.message });
   }

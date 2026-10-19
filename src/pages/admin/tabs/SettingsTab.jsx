@@ -9,6 +9,7 @@ export default function SettingsTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [retargeted, setRetargeted] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -46,8 +47,11 @@ export default function SettingsTab() {
     try {
       const res = await saveSettings(settings);
       setSettings(res.settings);
+      // The server re-points still-open checkout requests when the booking
+      // amount moves. Say how many followed, so it's visible rather than magic.
+      setRetargeted(Number(res.retargeted) || 0);
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      setTimeout(() => setSaved(false), 3500);
     } catch (err) { notify(err.message); }
     setSaving(false);
   }
@@ -65,6 +69,11 @@ export default function SettingsTab() {
       {saved && (
         <div style={saveToast}>
           <Check size={15} /> Settings saved successfully
+          {retargeted > 0 && (
+            <span style={{ fontWeight: 500, color: '#4A4A4A' }}>
+              — {retargeted} pending payment request{retargeted > 1 ? 's' : ''} updated to the new booking amount
+            </span>
+          )}
         </div>
       )}
       <div style={gridWrap}>
@@ -198,24 +207,24 @@ export default function SettingsTab() {
 function Section({ title, icon: Icon, children, accent, toggle, onToggle }) {
   return (
     <div style={{ ...card, borderColor: accent ? '#F2C9A8' : '#F1EDE4' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <Icon size={17} style={{ color: '#F2701D' }} />
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#161616' }}>{title}</h3>
+          <Icon size={16} style={{ color: '#F2701D' }} />
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#161616' }}>{title}</h3>
         </div>
         {toggle !== undefined && <Toggle value={toggle} onChange={onToggle} />}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{children}</div>
     </div>
   );
 }
 
 function Field({ label, hint, children }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: '#4A4A4A' }}>{label}</label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ fontSize: 11.5, fontWeight: 600, color: '#4A4A4A' }}>{label}</label>
       {children}
-      {hint && <span style={{ fontSize: 11, color: '#949494', lineHeight: 1.45 }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 10.5, color: '#949494', lineHeight: 1.4 }}>{hint}</span>}
     </div>
   );
 }
@@ -223,12 +232,12 @@ function Field({ label, hint, children }) {
 function Toggle({ value, onChange }) {
   return (
     <button onClick={() => onChange(!value)} style={{
-      width: 44, height: 24, borderRadius: 12, border: 'none', padding: 2, cursor: 'pointer',
+      width: 40, height: 22, borderRadius: 11, border: 'none', padding: 2, cursor: 'pointer',
       background: value ? '#F2701D' : '#C9C2B4', transition: 'background .2s',
     }}>
       <div style={{
-        width: 20, height: 20, borderRadius: 10, background: '#fff',
-        transform: `translateX(${value ? 20 : 0}px)`, transition: 'transform .2s',
+        width: 18, height: 18, borderRadius: 9, background: '#fff',
+        transform: `translateX(${value ? 18 : 0}px)`, transition: 'transform .2s',
         boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
       }} />
     </button>
@@ -236,28 +245,28 @@ function Toggle({ value, onChange }) {
 }
 
 const gridWrap = {
-  columns: '3 300px',
-  columnGap: 16,
+  columns: '3 220px',
+  columnGap: 14,
   minHeight: '100%',
 };
 
 const card = {
-  background: '#fff', borderRadius: 14, padding: 18,
+  background: '#fff', borderRadius: 14, padding: 16,
   boxShadow: '0 1px 4px rgba(0,0,0,0.04)', border: '1px solid #F1EDE4',
   breakInside: 'avoid',
-  marginBottom: 16,
+  marginBottom: 14,
 };
 
 const saveToast = {
-  padding: '9px 16px', borderRadius: 8, background: '#ECFDF5', color: '#059669',
-  fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
-  marginBottom: 16,
+  padding: '8px 14px', borderRadius: 8, background: '#ECFDF5', color: '#059669',
+  fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+  marginBottom: 14,
 };
 
-const hint = { fontSize: 11, color: '#949494', marginTop: 2 };
+const hint = { fontSize: 10.5, color: '#949494', marginTop: 2 };
 
 const inputStyle = {
-  width: '100%', padding: '8px 11px', borderRadius: 8,
-  border: '1.5px solid #E7E2D8', fontSize: 13, boxSizing: 'border-box',
+  width: '100%', padding: '7px 10px', borderRadius: 8,
+  border: '1.5px solid #E7E2D8', fontSize: 12.5, boxSizing: 'border-box',
   outline: 'none',
 };

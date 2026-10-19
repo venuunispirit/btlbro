@@ -460,7 +460,7 @@ function MarqueeEditor({ value, onChange, speedSeconds, onSpeedChange }) {
   const inputStyle = { width: '100%', padding: '8px 11px', borderRadius: 8, border: '1.5px solid #E5E7EB', fontSize: 12.5, boxSizing: 'border-box', background: '#fff' };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', gap: 14, alignItems: 'start' }}>
+    <div className="stack-sm" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', gap: 14, alignItems: 'start' }}>
       {/* ============ LEFT: vertical campaign cards (display-only) ============ */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1424,7 +1424,7 @@ export default function WebsiteTab() {
       {activeView === 'products' ? (
         <ProductsManager />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 14, alignItems: 'start' }}>
+        <div className="stack-sm" style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 14, alignItems: 'start' }}>
           {/* Col 1: Section list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, position: 'sticky', top: 16 }}>
             <input

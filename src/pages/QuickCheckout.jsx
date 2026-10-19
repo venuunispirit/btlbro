@@ -13,9 +13,17 @@ import {
   Building2,
   Cloud,
   RefreshCw,
+  ChevronRight,
+  Lock,
+  X,
 } from "lucide-react";
 
 const DRIVE_API = "/api/admin/google-drive";
+
+// Campaigns are billed for a single month. The duration picker was removed, so
+// this is fixed rather than user-chosen. The server clamps duration_months to
+// 1..24 (defaulting to 1) in priceCart, so sending 1 keeps both sides in step.
+const CAMPAIGN_MONTHS = 1;
 
 // "cup branding" → "Cup Branding"
 function prettyService(svc) {
@@ -221,12 +229,19 @@ const QuickCheckout = () => {
     business: "",
   });
   const [paymentMethod, setPaymentMethod] = useState("upi");
-  const [duration, setDuration] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [detailIndex, setDetailIndex] = useState(null);
   // Live collection request once /api/checkout/pay has answered.
   const [session, setSession] = useState(null); // { leadId, amount, reference, intentUri, payu, status }
   const [checkoutError, setCheckoutError] = useState("");
   const pollTimer = useRef(null);
+  const eventSourceRef = useRef(null);
+  const settledRef = useRef(false);
+  const [statusCheckDead, setStatusCheckDead] = useState(false);
   const qrDataUrl = useQrDataUrl(session?.intentUri || "");
 
   // Load Razorpay checkout script (lightweight, no-op if unused)
@@ -270,7 +285,7 @@ const QuickCheckout = () => {
   // Selections priced from the sheet don't pay a separate base location fee
   const selectionHasSheetPrices = checkoutData.some((loc) => servicesOf(loc).some((s) => s.price > 0));
   const perLocation = dataSourceIsDrive || selectionHasSheetPrices ? 0 : perLocationSetting;
-  const locationCost = perLocation * locationCount * duration;
+  const locationCost = perLocation * locationCount * CAMPAIGN_MONTHS;
 
   let promoCost = 0;
   const promoBreakdown = {};
@@ -306,7 +321,7 @@ const QuickCheckout = () => {
         locPromos.push({ key, label, price: 0, totalPrice: 0, selected: false, unavailable: true });
         return;
       }
-      const totalPrice = price * duration;
+      const totalPrice = price * CAMPAIGN_MONTHS;
       const selected = selections[key] === true; // unchecked by default, user must explicitly select
       locPromos.push({ key, label, price, totalPrice, selected });
       if (selected) {
@@ -334,12 +349,44 @@ const QuickCheckout = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   }
 
-  function handleProceed(e) {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone) {
-      alert("Please fill all fields");
-      return;
+  function validateField(name, value) {
+    const v = String(value || "").trim();
+    if (name === "name") {
+      return v ? "" : "Please enter your full name";
     }
+    if (name === "email") {
+      if (!v) return "Please enter your email address";
+      return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? "" : "Please enter a valid email address";
+    }
+    if (name === "phone") {
+      if (!v) return "Please enter your phone number";
+      const digits = String(v).replace(/\D/g, "");
+      return digits.length >= 10 ? "" : "Please enter a valid phone number";
+    }
+    return "";
+  }
+
+  // Gate the CTA until the contact fields are actually filled in — prevents
+  // a dead click, lets inline errors lead the correction instead.
+  const allValid = ["name", "email", "phone"].every((f) => !validateField(f, formData[f]));
+
+  function handleBlur(e) {
+    const { name, value } = e.target;
+    setTouched((t) => ({ ...t, [name]: true }));
+    setFormErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
+  }
+
+  // Validation-triggered step advance: errors only ever surface after a field
+  // is touched or a submit is attempted. No alert(), no permanently-visible
+  // hint — inline messages appear under the offending fields.
+  function handleSubmit(e) {
+    e.preventDefault();
+    const next = { name: "", email: "", phone: "" };
+    for (const f in next) next[f] = validateField(f, formData[f]);
+    setFormErrors(next);
+    setSubmitted(true);
+    setTouched({ name: true, email: true, phone: true });
+    if (Object.values(next).some(Boolean)) return;
     setStep(2);
   }
 
@@ -414,7 +461,7 @@ const QuickCheckout = () => {
           setCheckoutError(d.payment_error);
         }
         setIsProcessing(false);
-        if (d.intent_uri) startPolling(d.reference);
+        if (d.intent_uri) startWatching(d.reference);
         else setStep(3);
       })
       .catch((err) => {
@@ -423,32 +470,110 @@ const QuickCheckout = () => {
       });
   }
 
-  // Watch a reference until the gateway (or a manager) confirms it. Polling
-  // stops on success, on failure, and after a hard ceiling so a dead rail
-  // can't leave the customer on a spinner forever.
-  function startPolling(reference) {
-    if (pollTimer.current) clearInterval(pollTimer.current);
+  // Tear down whichever channel (stream or poll) is currently watching a
+  // reference. Safe to call repeatedly.
+  function stopWatching() {
+    if (pollTimer.current) { clearInterval(pollTimer.current); pollTimer.current = null; }
+    if (eventSourceRef.current) {
+      try { eventSourceRef.current.close(); } catch { /* already closed */ }
+      eventSourceRef.current = null;
+    }
+  }
+
+  // Fold a status payload into the session and act on terminal states. The
+  // server also sends the (possibly retargeted) amount + intent_uri, so a
+  // booking-amount change renders a fresh QR here without a page reload.
+  function applyPaymentStatus(d) {
+    if (!d || !d.status) return;
+    setSession((s) => {
+      if (!s) return s;
+      const nextAmount = typeof d.amount === 'number' && d.amount > 0 ? d.amount : s.amount;
+      const nextUri = d.intent_uri || s.intentUri;
+      if (s.status === d.status && s.amount === nextAmount && s.intentUri === nextUri) return s;
+      return { ...s, status: d.status, amount: nextAmount, intentUri: nextUri };
+    });
+    if (d.status === 'paid') {
+      settledRef.current = true;
+      stopWatching();
+      setStep(3);                       // the success step — realtime redirect
+    } else if (d.status === 'failed' || d.status === 'cancelled') {
+      settledRef.current = true;
+      stopWatching();
+    }
+  }
+
+  // Poll the status endpoint. A backstop for browsers/proxies where the SSE
+  // stream cannot be opened; keeps checking for ~30 min, then surfaces a
+  // manual button instead of dying silently on the customer.
+  function startFallbackPolling(reference) {
+    if (pollTimer.current) return;
     let attempts = 0;
-    pollTimer.current = setInterval(() => {
+    const tick = () => {
       attempts += 1;
       fetch(`/api/checkout/status/${encodeURIComponent(reference)}`)
         .then((r) => r.json())
-        .then((d) => {
-          if (d.status && d.status !== 'awaiting' && d.status !== 'processing') {
-            if (pollTimer.current) clearInterval(pollTimer.current);
-            setSession((s) => ({ ...s, status: d.status }));
-            if (d.status === 'paid') setStep(3);
-          }
-        })
+        .then((d) => applyPaymentStatus(d))
         .catch(() => {});
-      if (attempts > 90) {
-        if (pollTimer.current) clearInterval(pollTimer.current);
+      if (attempts >= 360) {
+        stopWatching();
+        setStatusCheckDead(true);
       }
-    }, 5000);
+    };
+    tick();
+    pollTimer.current = setInterval(tick, 5000);
+  }
+
+  // Watch a reference until the gateway (or a manager) confirms it. Preferred
+  // channel is the server push (SSE) so the page advances the instant the
+  // payment settles; polling is only the fallback.
+  function startWatching(reference) {
+    stopWatching();
+    settledRef.current = false;
+    setStatusCheckDead(false);
+
+    if (typeof window !== 'undefined' && 'EventSource' in window) {
+      let es = null;
+      try {
+        es = new EventSource(`/api/checkout/status/stream/${encodeURIComponent(reference)}`);
+      } catch {
+        es = null;
+      }
+      if (es) {
+        eventSourceRef.current = es;
+        let gotMessage = false;
+        // If the stream never delivers its snapshot (blocked proxy, buffered
+        // response), fall back to polling rather than wait forever.
+        const fallbackTimer = setTimeout(() => {
+          if (!gotMessage && !settledRef.current) {
+            if (eventSourceRef.current) {
+              try { eventSourceRef.current.close(); } catch { /* noop */ }
+              eventSourceRef.current = null;
+            }
+            startFallbackPolling(reference);
+          }
+        }, 8000);
+        es.onmessage = (ev) => {
+          gotMessage = true;
+          clearTimeout(fallbackTimer);
+          try { applyPaymentStatus(JSON.parse(ev.data)); } catch { /* ignore malformed frame */ }
+        };
+        es.onerror = () => {
+          clearTimeout(fallbackTimer);
+          if (settledRef.current) return;         // expected close after a terminal status
+          if (eventSourceRef.current) {
+            try { eventSourceRef.current.close(); } catch { /* noop */ }
+            eventSourceRef.current = null;
+          }
+          startFallbackPolling(reference);
+        };
+        return;
+      }
+    }
+    startFallbackPolling(reference);
   }
 
   useEffect(() => () => {
-    if (pollTimer.current) clearInterval(pollTimer.current);
+    stopWatching();
   }, []);
 
   function buildLeadPayload() {
@@ -462,7 +587,7 @@ const QuickCheckout = () => {
       radius: "5",
       pincode: pincode || "N/A",
       zone: "",
-      duration: `${duration} month${duration > 1 ? 's' : ''}`,
+      duration: `${CAMPAIGN_MONTHS} month${CAMPAIGN_MONTHS > 1 ? 's' : ''}`,
       startDate: "",
       message: "",
       budget: "",
@@ -492,7 +617,7 @@ const QuickCheckout = () => {
           services: servicesOf(loc).filter((svc) => sel[svc.key] === true).map((svc) => svc.key),
         };
       }),
-      duration_months: duration,
+      duration_months: CAMPAIGN_MONTHS,
       paymentMethod,
     };
   }
@@ -510,41 +635,60 @@ const QuickCheckout = () => {
   }
 
   return (
-    <div style={styles.page}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerInner}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <a href="/" style={styles.logo}>
-              <div style={styles.logoIcon}>B</div>
-              <span style={styles.logoText}>BTL Bro</span>
-            </a>
-          </div>
-          <div style={styles.steps}>
-            {["Details", "Payment", "Done"].map((s, i) => (
-              <div key={s} style={{ ...styles.step, ...(step >= i + 1 ? { opacity: 1 } : {}) }}>
-                <div style={{ ...styles.stepDot, ...(step >= i + 1 ? styles.stepDotActive : {}) }}>{i + 1}</div>
-                <span style={{ ...styles.stepLabel, ...(step === i + 1 ? { color: "#161616", fontWeight: 600 } : {}) }}>{s}</span>
-              </div>
-            ))}
-          </div>
+    <div className="checkout-page" style={styles.page}>
+      {/* Header — logo only. The stepper sits in its own bar below so the
+          header row stays uncluttered and the progress stays visible. */}
+      <header className="btl-page-header" style={styles.header}>
+        <div className="btl-header-inner" style={styles.headerInner}>
+          <a href="/" style={styles.logo}>
+            <div style={styles.logoIcon}>B</div>
+            <span style={styles.logoText}>BTL Bro</span>
+          </a>
         </div>
       </header>
 
-      <div style={styles.twoCol}>
+      {/* One container holds the progress indicator AND the two-column body, so
+          the steps share the cards' background, gutters and max width instead of
+          sitting in their own full-width strip. The wrapper adds no background,
+          border or vertical padding of its own - only a bottom margin. */}
+      <main className="checkout-page-container">
+        <div className="checkout-progress-wrapper">
+          <div className="checkout-progress"
+            role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={step}
+            aria-label={`Step ${step} of 3`}>
+            <div className="progress-steps">
+              <span className={`step-connector connector-1${step >= 2 ? " completed" : ""}`} aria-hidden="true" />
+              <span className={`step-connector connector-2${step >= 3 ? " completed" : ""}`} aria-hidden="true" />
+              {["Details", "Payment", "Done"].map((s, i) => {
+                const n = i + 1;
+                const state = n < step ? "completed" : n === step ? "active" : "inactive";
+                return (
+                  <div key={s} className={`progress-step ${state}`}>
+                    <div className={`step-circle ${state}`}>{n}</div>
+                    <span className="step-label">{s}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+      {/* The container (max-width + gutters) lives on <main> above, so this row
+          must not re-declare them or the cards would nest two gutters. */}
+      <div className="checkout-layout btl-two-col" style={styles.twoCol}>
         {/* ===== LEFT COLUMN: Form ===== */}
         <div style={styles.leftCol}>
           {/* ===== STEP 1: DETAILS ===== */}
           {step === 1 && (
-            <div style={styles.card}>
-              <button onClick={() => { window.location.href = '/'; }} style={styles.backLink}>
+            <div className="checkout-card" style={styles.card}>
+              <button onClick={() => { window.location.href = '/'; }} style={styles.backLink} className="co-back">
                 <ArrowLeft size={16} /> Back to Search
               </button>
-              <div style={styles.cardHeader}>
-                <Target size={28} color="#F2701D" />
-                <div>
-                  <h1 style={styles.title}>Quick Checkout</h1>
-                  <p style={styles.subtitle}>{locationCount} {category} locations {dataSourceIsDrive ? 'available' : 'selected'} {pincode ? `• Pincode: ${pincode}` : ''}</p>
+              <div style={styles.cardHeader} className="co-intro">
+                <Target size={28} color="#F2701D" className="co-intro-icon" />
+                <div style={{ minWidth: 0 }}>
+                  <h1 style={styles.title} className="co-title">Quick Checkout</h1>
+                  <p style={styles.subtitle} className="co-sub">{locationCount} {category} location{locationCount === 1 ? "" : "s"} {dataSourceIsDrive ? 'available' : 'selected'} {pincode ? `· Pincode: ${pincode}` : ''}</p>
                 </div>
               </div>
 
@@ -552,25 +696,32 @@ const QuickCheckout = () => {
 
               {/* Selected Locations list — read only */}
               {checkoutData.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={styles.sectionTitle}>Selected Locations</div>
-                  <div style={{ border: "1px solid #E7E2D8", borderRadius: 10, overflow: "hidden" }}>
+                <div className="co-locs-section" style={{ marginBottom: 20 }}>
+                  <div style={styles.sectionTitle} className="co-section-title">Selected Locations</div>
+                  <div className="co-loc-list" style={{ border: "1px solid #E7E2D8", borderRadius: 10, overflow: "hidden" }}>
                     {checkoutData.map((loc, idx) => {
                       const locInfo = locationPrices[idx] || { promos: [] };
-                      const selectedPromos = locInfo.promos.filter(p => !p.unavailable);
+                      const selectedPromos = locInfo.promos.filter(p => p.selected);
                       return (
-                        <div key={loc.id || idx} style={{ padding: "12px 16px", borderBottom: idx < checkoutData.length - 1 ? "1px solid #F0EDE8" : "none" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: selectedPromos.length > 0 ? 8 : 0 }}>
+                        <div key={loc.id || idx} className="co-loc-row"
+                          role="button" tabIndex={0}
+                          onClick={() => setDetailIndex(idx)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailIndex(idx); }
+                          }}
+                          style={{ padding: "12px 16px", borderBottom: idx < checkoutData.length - 1 ? "1px solid #F0EDE8" : "none" }}>
+                          <div className="co-loc-main" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: selectedPromos.length > 0 ? 8 : 0 }}>
                             <div style={{ width: 26, height: 26, borderRadius: 8, background: "#FFF4EC", color: "#F2701D", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: "#161616" }}>{loc.name || loc.fullName}</div>
-                              <div style={{ fontSize: 11, color: "#949494", textTransform: "capitalize" }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div className="co-loc-name" style={{ fontSize: 13, fontWeight: 600, color: "#161616" }}>{loc.name || loc.fullName}</div>
+                              <div className="co-loc-meta" style={{ fontSize: 11, color: "#949494", textTransform: "capitalize" }}>
                                 {loc.type}{loc.sheetDistance > 0 ? ` • ${loc.sheetDistance} km` : loc.distance > 0 ? ` • ${loc.distance.toFixed(1)} km` : ''}
                               </div>
                             </div>
+                            <ChevronRight size={18} color="#C9C2B4" className="co-loc-chevron mobile-only" />
                           </div>
                           {selectedPromos.length > 0 && (
-                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingLeft: 38 }}>
+                            <div className="co-loc-promos" style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingLeft: 38 }}>
                               {selectedPromos.map((p) => (
                                 <span key={p.key} style={{
                                   padding: "4px 10px",
@@ -597,89 +748,75 @@ const QuickCheckout = () => {
                 </div>
               )}
 
-              {/* Duration */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={styles.sectionTitle}>Campaign Duration</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {[1, 2, 3, 6, 12].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setDuration(m)}
-                      style={{
-                        flex: 1,
-                        padding: "10px 8px",
-                        borderRadius: 8,
-                        border: duration === m ? "2px solid #F2701D" : "1.5px solid #E7E2D8",
-                        background: duration === m ? "#FFF4EC" : "#FAF9F7",
-                        color: duration === m ? "#F2701D" : "#656565",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: "'Inter', sans-serif",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      {m} {m === 1 ? 'Month' : 'Months'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Contact Form */}
-              <form onSubmit={handleProceed}>
-                <div style={styles.sectionTitle}>Your Details</div>
-                <div style={styles.formGrid}>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Full Name *</label>
-                    <div style={styles.inputWrap}>
+              <form onSubmit={handleSubmit} noValidate>
+                <div style={styles.sectionTitle} className="co-section-title">Your Details</div>
+                <div className="btl-form-grid checkout-form-grid" style={styles.formGrid}>
+                  <div className="co-field" style={styles.field}>
+                    <label style={styles.label} className="co-label">Full Name *</label>
+                    <div style={styles.inputWrap} className="co-input-wrap">
                       <User size={16} color="#949494" />
-                      <input name="name" value={formData.name} onChange={handleChange} style={styles.input} placeholder="John Doe" required />
+                      <input name="name" value={formData.name} onChange={handleChange} onBlur={handleBlur} autoComplete="name" style={styles.input} className="co-input" placeholder="John Doe" required />
                     </div>
+                    {(touched.name || submitted) && formErrors.name && <p className="co-error">{formErrors.name}</p>}
                   </div>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Business Name</label>
-                    <div style={styles.inputWrap}>
+                  <div className="co-field" style={styles.field}>
+                    <label style={styles.label} className="co-label">Business Name</label>
+                    <div style={styles.inputWrap} className="co-input-wrap">
                       <Building2 size={16} color="#949494" />
-                      <input name="business" value={formData.business} onChange={handleChange} style={styles.input} placeholder="Your business name" />
+                      <input name="business" value={formData.business} onChange={handleChange} autoComplete="organization" style={styles.input} className="co-input" placeholder="Your business name" />
                     </div>
                   </div>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Email *</label>
-                    <div style={styles.inputWrap}>
+                  <div className="co-field" style={styles.field}>
+                    <label style={styles.label} className="co-label">Email *</label>
+                    <div style={styles.inputWrap} className="co-input-wrap">
                       <Mail size={16} color="#949494" />
-                      <input name="email" type="email" value={formData.email} onChange={handleChange} style={styles.input} placeholder="you@email.com" required />
+                      <input name="email" type="email" value={formData.email} onChange={handleChange} onBlur={handleBlur} autoComplete="email" style={styles.input} className="co-input" placeholder="you@email.com" required />
                     </div>
+                    {(touched.email || submitted) && formErrors.email && <p className="co-error">{formErrors.email}</p>}
                   </div>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Phone *</label>
-                    <div style={styles.inputWrap}>
+                  <div className="co-field" style={styles.field}>
+                    <label style={styles.label} className="co-label">Phone *</label>
+                    <div style={styles.inputWrap} className="co-input-wrap">
                       <Phone size={16} color="#949494" />
-                      <input name="phone" type="tel" value={formData.phone} onChange={handleChange} style={styles.input} placeholder="+91 98765 43210" required />
+                      <input name="phone" type="tel" value={formData.phone} onChange={handleChange} onBlur={handleBlur} autoComplete="tel" style={styles.input} className="co-input" placeholder="+91 98765 43210" required />
                     </div>
+                    {(touched.phone || submitted) && formErrors.phone && <p className="co-error">{formErrors.phone}</p>}
                   </div>
                 </div>
-                {formData.name && formData.email && formData.phone ? (
-                  <button type="submit" style={styles.primaryBtn}>
-                    Proceed to Payment <ArrowRight size={16} />
-                  </button>
-                ) : (
-                  <div>
-                    <button type="submit" disabled style={{ ...styles.primaryBtn, background: "#D8D2C6", cursor: "not-allowed" }}>
-                      Proceed to Payment <ArrowRight size={16} />
-                    </button>
-                    <p style={{ fontSize: 12, color: "#949494", marginTop: 8, textAlign: "center" }}>
-                      Please fill all required fields (Name, Email, Phone)
-                    </p>
+
+                {/* Booking fee summary — condensed card above the CTA, shown on
+                    mobile only. The desktop right rail already renders the full
+                    payment summary, so this never duplicates on wide screens.
+                    Tapping it pops the full Payment Summary dialog. */}
+                <button type="button" className="co-fee-card co-fee-btn mobile-only" onClick={() => setSummaryOpen(true)}>
+                  <div style={{ minWidth: 0, textAlign: "left" }}>
+                    <div className="co-fee-label">Booking Fee</div>
+                    <div className="co-fee-sub">For {locationCount} location{locationCount === 1 ? "" : "s"}</div>
                   </div>
-                )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="co-fee-amount">₹{advancePayment.toLocaleString()}</span>
+                    <ChevronRight size={16} color="#C9C2B4" />
+                  </div>
+                </button>
+
+                <button type="submit" className="co-cta" style={styles.primaryBtn} disabled={!allValid}>
+                  Proceed to Payment
+                  <span className="co-cta-amount mobile-only">· ₹{advancePayment.toLocaleString()}</span>
+                  <ArrowRight size={16} />
+                </button>
+
+                <div className="co-trust mobile-only">
+                  <Lock size={12} />
+                  <span>Secure checkout · Instant confirmation</span>
+                </div>
               </form>
             </div>
           )}
 
           {/* ===== STEP 2: PAYMENT ===== */}
           {step === 2 && (
-            <div style={styles.card}>
+            <div className="checkout-card" style={styles.card}>
               <div style={styles.cardHeader}>
                 <CreditCard size={28} color="#F2701D" />
                 <div>
@@ -742,40 +879,50 @@ const QuickCheckout = () => {
               </div>
 
               {paymentMethod === "upi" && (
-                <div style={styles.field}>
-                  <label style={styles.label}>UPI ID</label>
-                  <input style={styles.input} placeholder="yourname@upi" />
+                <div className="co-field" style={styles.field}>
+                  <label className="co-label" style={styles.label}>UPI ID</label>
+                  <div style={styles.inputWrap} className="co-input-wrap">
+                    <input style={styles.input} className="co-input" placeholder="yourname@upi" inputMode="email" autoComplete="off" />
+                  </div>
                 </div>
               )}
 
               {paymentMethod === "card" && (
                 <div style={{ display: "grid", gap: 12 }}>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Card Number</label>
-                    <input style={styles.input} placeholder="1234 5678 9012 3456" />
+                  <div className="co-field" style={styles.field}>
+                    <label className="co-label" style={styles.label}>Card Number</label>
+                    <div style={styles.inputWrap} className="co-input-wrap">
+                      <input style={styles.input} className="co-input" placeholder="1234 5678 9012 3456" inputMode="numeric" autoComplete="cc-number" />
+                    </div>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Expiry</label>
-                      <input style={styles.input} placeholder="MM/YY" />
+                    <div className="co-field" style={styles.field}>
+                      <label className="co-label" style={styles.label}>Expiry</label>
+                      <div style={styles.inputWrap} className="co-input-wrap">
+                        <input style={styles.input} className="co-input" placeholder="MM/YY" inputMode="numeric" autoComplete="cc-exp" />
+                      </div>
                     </div>
-                    <div style={styles.field}>
-                      <label style={styles.label}>CVV</label>
-                      <input style={styles.input} type="password" placeholder="***" />
+                    <div className="co-field" style={styles.field}>
+                      <label className="co-label" style={styles.label}>CVV</label>
+                      <div style={styles.inputWrap} className="co-input-wrap">
+                        <input style={styles.input} className="co-input" type="password" placeholder="***" inputMode="numeric" autoComplete="cc-csc" />
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
               {paymentMethod === "netbanking" && (
-                <div style={styles.field}>
-                  <label style={styles.label}>Select Bank</label>
-                  <select style={styles.input}>
-                    <option>HDFC Bank</option>
-                    <option>ICICI Bank</option>
-                    <option>SBI</option>
-                    <option>Axis Bank</option>
-                  </select>
+                <div className="co-field" style={styles.field}>
+                  <label className="co-label" style={styles.label}>Select Bank</label>
+                  <div style={styles.inputWrap} className="co-input-wrap">
+                    <select style={styles.input} className="co-input">
+                      <option>HDFC Bank</option>
+                      <option>ICICI Bank</option>
+                      <option>SBI</option>
+                      <option>Axis Bank</option>
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -784,11 +931,11 @@ const QuickCheckout = () => {
                 <span style={{ fontSize: 12, color: "#16a34a" }}>256-bit SSL secured payment</span>
               </div>
 
-              <div style={{ display: "flex", gap: 12 }}>
-                <button onClick={() => setStep(1)} style={styles.secondaryBtn}>
+              <div className="payment-actions" style={{ display: "flex", gap: 12 }}>
+                <button onClick={() => setStep(1)} className="back-button" style={styles.secondaryBtn}>
                   <ArrowLeft size={16} /> Back
                 </button>
-                <button onClick={handlePay} disabled={isProcessing} style={{ ...styles.primaryBtn, opacity: isProcessing ? 0.7 : 1, marginTop: 0 }}>
+                <button onClick={handlePay} disabled={isProcessing} className="pay-button" style={{ ...styles.primaryBtn, opacity: isProcessing ? 0.7 : 1, marginTop: 0 }}>
                   {isProcessing ? "Processing..." : <>Pay ₹{advancePayment.toLocaleString()} Now <ArrowRight size={16} /></>}
                 </button>
               </div>
@@ -810,14 +957,16 @@ const QuickCheckout = () => {
                     {session.status === "paid"
                       ? "Payment received"
                       : session.status === "awaiting"
-                        ? "Waiting for payment — this page updates automatically"
+                        ? statusCheckDead
+                          ? "Haven't been able to check for a moment — tap below if you have already paid."
+                          : "Waiting for payment — this page updates automatically"
                         : `Payment ${session.status}`}
                   </p>
 
                   {qrDataUrl ? (
-                    <img src={qrDataUrl} alt={`UPI QR for ₹${session.amount}`} style={{ width: 240, height: 240, background: "#fff", borderRadius: 10, border: "1px solid #E7E2D8" }} />
+                    <img className="btl-qr" src={qrDataUrl} alt={`UPI QR for ₹${session.amount}`} style={{ background: "#fff", borderRadius: 10, border: "1px solid #E7E2D8" }} />
                   ) : (
-                    <div style={{ width: 240, height: 240, margin: "0 auto", borderRadius: 10, background: "#fff", border: "1px solid #E7E2D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#949494" }}>
+                    <div className="btl-qr" style={{ margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#949494" }}>
                       Preparing QR…
                     </div>
                   )}
@@ -835,6 +984,14 @@ const QuickCheckout = () => {
                       >
                         Copy link
                       </button>
+                      {statusCheckDead && (
+                        <button
+                          onClick={() => startWatching(session.reference)}
+                          style={{ ...styles.primaryBtn, width: "auto", marginTop: 0, textDecoration: "none" }}
+                        >
+                          Check payment status
+                        </button>
+                      )}
                     </div>
                   )}
                   <p style={{ fontSize: 10, color: "#B0AAA0", marginTop: 12, wordBreak: "break-all" }}>
@@ -881,7 +1038,7 @@ const QuickCheckout = () => {
 
         {/* ===== RIGHT COLUMN: Selected Locations ===== */}
         {step < 3 && (
-          <div style={styles.rightCol}>
+          <div className="btl-side-col" style={styles.rightCol}>
             <div style={styles.rightCard}>
               <div style={styles.rightHeader}>
                 <CreditCard size={18} color="#F2701D" />
@@ -903,10 +1060,6 @@ const QuickCheckout = () => {
                     <span style={{ fontWeight: 600, color: "#161616" }}>{locationCount}</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                    <span style={{ color: "#656565" }}>Duration</span>
-                    <span style={{ fontWeight: 600, color: "#161616" }}>{duration} {duration === 1 ? 'Month' : 'Months'}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                     <span style={{ color: "#656565" }}>Pincode</span>
                     <span style={{ fontWeight: 600, color: "#161616" }}>{pincode || 'N/A'}</span>
                   </div>
@@ -914,7 +1067,7 @@ const QuickCheckout = () => {
                 <div style={{ borderTop: "1px solid #E7E2D8", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                   {locationCost > 0 && (
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                      <span style={{ color: "#656565" }}>Location Cost ({locationCount} × ₹{perLocation} × {duration}mo)</span>
+                      <span style={{ color: "#656565" }}>Location Cost ({locationCount} × ₹{perLocation})</span>
                       <span style={{ fontWeight: 500, color: "#161616" }}>₹{locationCost.toLocaleString()}</span>
                     </div>
                   )}
@@ -968,6 +1121,98 @@ const QuickCheckout = () => {
           </div>
         )}
       </div>
+      </main>
+
+      {/* ===== Popups: Payment Summary (fee card tap) / Service Details (location tap) ===== */}
+      {(summaryOpen || detailIndex !== null) && (
+        <div className="co-modal-overlay" onClick={() => { setSummaryOpen(false); setDetailIndex(null); }}>
+          <div className="co-modal" role="dialog" aria-modal="true" aria-label={summaryOpen ? "Payment Summary" : "Selected Services"}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="co-modal-head">
+              {summaryOpen ? <CreditCard size={20} color="#F2701D" /> : <MapPin size={20} color="#F2701D" />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3>{summaryOpen ? "Payment Summary" : "Selected Services"}</h3>
+                <p>{summaryOpen ? "Your booking at a glance" : (() => {
+                  const l = checkoutData[detailIndex];
+                  return l ? (l.name || l.fullName || "Location") : "";
+                })()}</p>
+              </div>
+              <button type="button" className="co-modal-close" aria-label="Close"
+                onClick={() => { setSummaryOpen(false); setDetailIndex(null); }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {summaryOpen ? (
+              <div className="co-summary-body">
+                <div className="co-summary-hero">
+                  <p>Booking Fee</p>
+                  <p className="co-summary-big">₹{advancePayment.toLocaleString()}</p>
+                  <p>Total campaign value: ₹{total.toLocaleString()} &middot; balance requested later</p>
+                </div>
+                <div className="co-summary-rows">
+                  <div className="co-summary-row"><span className="k">Category</span><span className="v">{category}</span></div>
+                  <div className="co-summary-row"><span className="k">Locations</span><span className="v">{locationCount}</span></div>
+                  <div className="co-summary-row"><span className="k">Pincode</span><span className="v">{pincode || 'N/A'}</span></div>
+                </div>
+                <div className="co-summary-rows">
+                  {locationCost > 0 && (
+                    <div className="co-summary-row"><span className="k">Location Cost ({locationCount} &times; ₹{perLocation})</span><span className="v">₹{locationCost.toLocaleString()}</span></div>
+                  )}
+                  {Object.entries(promoBreakdown || {}).map(([key, val]) => {
+                    const count = typeof val === 'object' ? val.count || 0 : val;
+                    const label = (typeof val === 'object' ? val.label : null) || key;
+                    const typeTotal = val.total || 0;
+                    return (
+                      <div key={key} className="co-summary-row"><span className="k">{label} ({count})</span><span className="v">₹{typeTotal.toLocaleString()}</span></div>
+                    );
+                  })}
+                  {promoCost > 0 && (
+                    <div className="co-summary-row strong"><span className="k">Promotions Total</span><span className="v">₹{promoCost.toLocaleString()}</span></div>
+                  )}
+                  <div className="co-summary-row"><span className="k">Agency Fee ({agencyFeePercent}%)</span><span className="v">₹{setupFee.toLocaleString()}</span></div>
+                  <div className="co-summary-row"><span className="k">GST (18%)</span><span className="v">₹{gst.toLocaleString()}</span></div>
+                </div>
+                <div className="co-summary-totals">
+                  <div className="co-summary-row big"><span className="k">Pay Now (Booking)</span><span className="v">₹{advancePayment.toLocaleString()}</span></div>
+                  <div className="co-summary-row small"><span className="k">Balance (requested later)</span><span className="v">₹{Math.max(0, total - advancePayment).toLocaleString()}</span></div>
+                </div>
+              </div>
+            ) : detailIndex !== null && checkoutData[detailIndex] ? (
+              (() => {
+                const l = checkoutData[detailIndex];
+                const locInfo = locationPrices[detailIndex] || { promos: [], hasSheetPrices: false };
+                const servs = locInfo.promos.filter((p) => p.selected);
+                const meta =
+                  `${l.type || ""
+                  }${l.sheetDistance > 0 ? ` · ${l.sheetDistance} km` : l.distance > 0 ? ` · ${l.distance.toFixed(1)} km` : ""}`;
+                return (
+                  <div className="co-summary-body">
+                    <div className="co-detail-meta">
+                      <div className="co-detail-name">{l.name || l.fullName}</div>
+                      {meta && <div className="co-detail-sub">{meta}</div>}
+                    </div>
+                    {servs.length > 0 ? (
+                      <div className="co-summary-rows">
+                        {servs.map((p) => (
+                          <div key={p.key} className="co-summary-row">
+                            <span className="k">{p.label}</span>
+                            <span className="v">₹{p.price.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: 13, color: "#8A8377", lineHeight: 1.5 }}>
+                        No services selected for this location yet. You can choose services in the checkout grid or add them from the campaign builder.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()
+            ) : null}
+          </div>
+        </div>
+      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -975,9 +1220,256 @@ const QuickCheckout = () => {
         body { font-family: 'Inter', sans-serif; background: #f5f5f5; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-spin { animation: spin 1s linear infinite; }
-        @media (max-width: 900px) {
-          .checkout-two-col { flex-direction: column !important; }
-          .checkout-right-col { display: none !important; }
+        /* Layout is handled by the shared hooks in styles/responsive.css.
+           This block only covers what is unique to this page. */
+
+        /* Pieces that exist for the mobile layout only. Hidden on desktop so
+           the right-hand payment rail keeps owning the summary there. */
+        .mobile-only { display: none; }
+
+        /* ---- Popups (Payment Summary / Service Details) --------------------
+           Bottom sheet on phones, centred card on desktop. Location rows are
+           tappable at every size, so the sheet must exist on large screens too. */
+        .co-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 90;
+          background: rgba(22, 22, 22, 0.45);
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+        }
+        .co-modal {
+          width: 100%;
+          max-width: 480px;
+          background: #fff;
+          border-radius: 20px 20px 0 0;
+          max-height: 85vh;
+          overflow-y: auto;
+          padding: 20px 20px 26px;
+        }
+        .co-modal-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+        .co-modal-head h3 { font-size: 18px; font-weight: 700; color: #161616; }
+        .co-modal-head p { font-size: 13px; color: #8A8377; margin-top: 2px; }
+        .co-modal-close {
+          border: 0;
+          background: #F5F3EE;
+          color: #161616;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .co-summary-hero { text-align: center; padding: 14px 0 18px; border-bottom: 1px solid #E7E2D8; margin-bottom: 16px; }
+        .co-summary-hero > p { font-size: 12px; color: #949494; margin-bottom: 4px; }
+        .co-summary-hero .co-summary-big { font-size: 36px; font-weight: 700; color: #F2701D; line-height: 1.1; margin: 2px 0 4px; }
+        .co-summary-body { display: flex; flex-direction: column; }
+        .co-summary-rows { display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }
+        .co-summary-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+        .co-summary-row .k { color: #656565; }
+        .co-summary-row .v { font-weight: 600; color: #161616; text-align: right; }
+        .co-summary-row.strong .k, .co-summary-row.strong .v { font-weight: 700; }
+        .co-summary-row.big .k { font-size: 15px; font-weight: 700; color: #161616; }
+        .co-summary-row.big .v { font-size: 20px; font-weight: 800; color: #F2701D; }
+        .co-summary-row.small .k, .co-summary-row.small .v { font-size: 12px; color: #949494; }
+        .co-summary-totals { border-top: 2px solid #E7E2D8; padding-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+        .co-detail-meta { border-bottom: 1px solid #E7E2D8; padding-bottom: 14px; margin-bottom: 16px; }
+        .co-detail-name { font-size: 16px; font-weight: 600; color: #161616; }
+        .co-detail-sub { font-size: 13px; color: #8A8377; margin-top: 3px; text-transform: capitalize; }
+
+        /* Location rows are tappable at every size (open the service popup). */
+        .co-loc-row { cursor: pointer; }
+        .co-loc-row:focus-visible { outline: 2px solid #F2701D; outline-offset: 2px; }
+
+        @media (min-width: 769px) {
+          .co-modal-overlay { align-items: center; padding: 24px; }
+          .co-modal { border-radius: 16px; max-width: 440px; max-height: 80vh; }
+        }
+
+        @media (max-width: 768px) {
+          body { background: #f8f7f4 !important; }
+          .checkout-page { background: #f8f7f4 !important; }
+
+          /* Header — slimmer row with the logo sitting on a warm definition line. */
+          .checkout-page .btl-header-inner {
+            max-width: 480px;
+            padding: 14px 16px;
+          }
+
+          /* Everything below lives inside a comfortable 480px column. */
+          .checkout-page .checkout-page-container {
+            max-width: 480px;
+            padding: 20px 16px 32px;
+          }
+
+          /* Open the big white card so the page breathes. The location and fee
+             cards below carry their own surfaces now. */
+          .checkout-page .checkout-card {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+          }
+
+          /* The rail's full payment summary is exactly what the fee card +
+             trust line now supply in-flow on a phone, so it is hidden instead
+             of repeating. */
+          .checkout-page .btl-side-col { display: none !important; }
+
+          /* Step progress stays visible on phones — it is the only marker of the
+             3-step journey, so hiding it left the flow with no orientation.
+             Kept compact with a tighter bottom margin instead. */
+          .checkout-page .checkout-progress-wrapper { display: block !important; margin-bottom: 18px !important; }
+
+          /* Back link — quiet helper text. */
+          .checkout-page .co-back { font-size: 13px !important; gap: 5px !important; margin-bottom: 14px !important; }
+
+          /* Intro — 26px title straight from the mockup. */
+          .checkout-page .co-intro { gap: 10px !important; margin-bottom: 22px !important; }
+          .checkout-page .co-intro-icon { display: none !important; }
+          .checkout-page .co-title { font-size: 26px !important; line-height: 1.15 !important; }
+          .checkout-page .co-sub { font-size: 14px !important; color: #8A8377 !important; margin-top: 4px !important; }
+
+          /* Section labels — tiny capitals, muted. */
+          .checkout-page .co-section-title { font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0.08em !important; color: #8A8377 !important; margin: 0 0 14px !important; }
+
+          /* Selected locations — each row becomes its own soft card. */
+          .checkout-page .co-loc-list { border: none !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+          .checkout-page .co-loc-row {
+            padding: 14px 16px !important;
+            border: 1px solid #E7E2D8 !important;
+            border-bottom: 1px solid #E7E2D8 !important;
+            border-radius: 14px !important;
+            background: #fff !important;
+            margin-bottom: 10px !important;
+          }
+          .checkout-page .co-loc-name { font-size: 15px !important; font-weight: 600 !important; color: #161616 !important; overflow-wrap: anywhere; }
+          .checkout-page .co-loc-meta { font-size: 13px !important; color: #8A8377 !important; margin-top: 2px !important; }
+          .checkout-page .co-loc-chevron { flex-shrink: 0; }
+          .checkout-page .co-loc-promos { padding-left: 0 !important; margin-top: 8px !important; }
+
+          /* Form — one comfortable column of 54px touch targets. */
+          .checkout-page .checkout-form-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 16px !important; }
+          .checkout-page .co-field { gap: 5px !important; }
+          .checkout-page .co-label { font-size: 14px !important; font-weight: 500 !important; color: #161616 !important; margin-bottom: 2px !important; }
+          .checkout-page .co-input-wrap {
+            min-height: 54px !important;
+            padding: 0 14px !important;
+            border: 1px solid #E7E2D8 !important;
+            border-radius: 12px !important;
+            background: #fff !important;
+          }
+          .checkout-page .co-input-wrap:focus-within {
+            border-color: #F2701D !important;
+            box-shadow: 0 0 0 3px rgba(242, 112, 29, 0.12) !important;
+          }
+          /* 16px on the inputs stops iOS Safari from zooming into the field. */
+          .checkout-page .co-input { font-size: 16px !important; color: #161616 !important; }
+          .checkout-page .co-input::placeholder { color: #B9B3A6 !important; }
+          .checkout-page .co-error { font-size: 12px !important; color: #C0392B; margin-top: 5px !important; }
+
+          .checkout-page .mobile-only { display: flex; }
+
+          /* Booking fee summary card, pinned right above the CTA. */
+          .checkout-page .co-fee-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: #FFF8F2;
+            border: 1px solid #F1E5DA;
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-top: 18px;
+          }
+          .checkout-page .co-fee-card.co-fee-btn {
+            width: 100%;
+            border: 1px solid #F1E5DA;
+            font: inherit;
+            cursor: pointer;
+            color: inherit;
+          }
+          .checkout-page .co-fee-label { font-size: 14px; font-weight: 500; color: #161616; }
+          .checkout-page .co-fee-sub { font-size: 12px; color: #8A8377; margin-top: 2px; }
+          .checkout-page .co-fee-amount { font-size: 24px; font-weight: 700; color: #F2701D; line-height: 1; }
+
+          /* Primary CTA — a full-width, 56px bar. */
+          .checkout-page .co-cta {
+            min-height: 56px !important;
+            padding: 0 20px !important;
+            border-radius: 14px !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            margin-top: 14px !important;
+          }
+          .checkout-page .co-cta:disabled { background: #DED8CF !important; color: #fff !important; cursor: not-allowed; }
+          .checkout-page .co-cta:active { transform: translateY(1px); }
+          .checkout-page .co-cta-amount { font-weight: 600 !important; opacity: 0.95; }
+
+          /* Trust line under the CTA. */
+          .checkout-page .co-trust {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #8A8377;
+            margin-top: 10px;
+          }
+
+          /* Payment actions — Back + Pay Now as one aligned action group. */
+          .checkout-page .payment-actions {
+            display: flex !important;
+            align-items: stretch;
+            gap: 12px;
+            width: 100% !important;
+            margin-top: 16px;
+          }
+          .checkout-page .back-button {
+            flex: 0 0 84px !important;
+            min-height: 54px;
+            border: 1px solid #E7E2D8 !important;
+            background: #fff !important;
+            color: #4A4A4A !important;
+            border-radius: 12px !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 16px !important;
+            font-weight: 500 !important;
+            padding: 0 16px !important;
+            box-sizing: border-box;
+          }
+          .checkout-page .pay-button {
+            flex: 1 !important;
+            min-height: 54px;
+            border: none !important;
+            background: #F2701D !important;
+            color: #fff !important;
+            border-radius: 12px !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            padding: 0 18px !important;
+            box-sizing: border-box;
+            white-space: nowrap;
+          }
+          .checkout-page .back-button:active,
+          .checkout-page .pay-button:active { transform: translateY(1px); }
+        }
+        /* .checkout-progress / .progress-step / .step-circle / .step-connector
+           styling lives in styles/responsive.css alongside the other page
+           layout hooks. */
+        @media (prefers-reduced-motion: reduce) {
+          .animate-spin { animation: none !important; }
         }
       `}</style>
     </div>
@@ -987,19 +1479,18 @@ const QuickCheckout = () => {
 const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", fontFamily: "'Inter', sans-serif" },
   header: { background: "#fff", borderBottom: "1px solid #E7E2D8", position: "sticky", top: 0, zIndex: 50 },
-  headerInner: { maxWidth: 1100, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" },
+  headerInner: { maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  /* Progress bar styling lives in styles/responsive.css (.checkout-progress). */
   logo: { display: "flex", alignItems: "center", gap: 10, textDecoration: "none" },
   logoIcon: { width: 32, height: 32, borderRadius: 8, background: "#F2701D", color: "#fff", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" },
   logoText: { fontSize: 16, fontWeight: 700, color: "#161616" },
-  steps: { display: "flex", gap: 16 },
-  step: { display: "flex", alignItems: "center", gap: 6, opacity: 0.4 },
-  stepDot: { width: 22, height: 22, borderRadius: "50%", background: "#E7E2D8", color: "#fff", fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" },
-  stepDotActive: { background: "#F2701D" },
-  stepLabel: { fontSize: 12, fontWeight: 500, color: "#949494" },
-  twoCol: { maxWidth: 1100, margin: "32px auto", padding: "0 24px", display: "flex", gap: 24, alignItems: "flex-start" },
+  /* max-width / margin / padding come from .checkout-page-container on <main>,
+     so this row only lays its own two columns out. */
+  twoCol: { display: "flex", gap: 24, alignItems: "flex-start" },
   leftCol: { flex: 1, minWidth: 0 },
-  rightCol: { width: 320, flexShrink: 0, position: "sticky", top: 80 },
-  card: { background: "#fff", borderRadius: 16, padding: 32, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", border: "1px solid #E7E2D8" },
+  /* top comes from .btl-side-col in responsive.css — do not set it inline. */
+  rightCol: { width: 320, flexShrink: 0 },
+  card: { background: "#fff", borderRadius: 16, padding: 32, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", border: "1px solid #E7E2D8", maxWidth: "100%", boxSizing: "border-box" },
   rightCard: { background: "#fff", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", border: "1px solid #E7E2D8", overflow: "hidden" },
   rightHeader: { display: "flex", alignItems: "center", gap: 8, padding: "16px 18px", background: "#FAF9F7", borderBottom: "1px solid #E7E2D8" },
   rightTitle: { fontWeight: 700, fontSize: 14, color: "#161616", flex: 1 },
@@ -1037,7 +1528,7 @@ const styles = {
   summaryLabel: { color: "#656565" },
   summaryValue: { fontWeight: 600, color: "#161616" },
   sectionTitle: { fontSize: 13, fontWeight: 600, color: "#4A4A4A", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12, marginTop: 8 },
-  formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 },
+  formGrid: { display: "grid", gap: 14, marginBottom: 20 },
   field: { display: "grid", gap: 4 },
   label: { fontSize: 13, fontWeight: 600, color: "#4A4A4A" },
   inputWrap: { display: "flex", alignItems: "center", gap: 8, padding: "0 14px", border: "1.5px solid #E7E2D8", borderRadius: 8, background: "#FAF9F7" },
