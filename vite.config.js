@@ -46,6 +46,11 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      "/socket.io": {
+        target: apiTarget,
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   // `vite preview` runs its own host check, so it needs the same list.

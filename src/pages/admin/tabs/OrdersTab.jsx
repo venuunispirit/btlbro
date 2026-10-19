@@ -197,7 +197,7 @@ export default function OrdersTab({ onNavigate: onChat }) {
                       <td style={tdStyle} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                           {o.user?.phone && (
-                            <button title="Message on WhatsApp" onClick={() => onChat?.('chat', { leadId: o.lead_id })}
+                            <button title="Message on WhatsApp" onClick={() => onChat?.('whatsapp', { leadId: o.lead_id })}
                               style={{ padding: 4, borderRadius: 4, border: 'none', background: 'none', color: '#059669', cursor: o.lead_id ? 'pointer' : 'default', display: 'inline-flex' }}>
                               <MessageSquare size={14} />
                             </button>

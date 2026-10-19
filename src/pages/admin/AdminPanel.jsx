@@ -21,6 +21,7 @@ import AnalyticsTab from './tabs/AnalyticsTab.jsx';
 import TeamTab from './tabs/TeamTab.jsx';
 import SettingsTab from './tabs/SettingsTab.jsx';
 import ChatTab from './tabs/ChatTab.jsx';
+import TeamChatTab from './tabs/TeamChatTab.jsx';
 import DepartmentsTab from './tabs/DepartmentsTab.jsx';
 import SiteSurveysTab from './tabs/SiteSurveysTab.jsx';
 import CompaniesTab from './tabs/CompaniesTab.jsx';
@@ -28,7 +29,7 @@ import AccountsTab from './tabs/AccountsTab.jsx';
 import VendorsTab from './tabs/VendorsTab.jsx';
 
 const NAV_LABELS = {
-  dashboard: 'Dashboard', orders: 'Orders', payments: 'Payments', leads: 'Leads', chat: 'Chat',
+  dashboard: 'Dashboard', orders: 'Orders', payments: 'Payments', leads: 'Leads', chat: 'Team Chat', whatsapp: 'WhatsApp',
   companies: 'Companies', accounts: 'Accounts', vendors: 'Vendors',
   team: 'Team', departments: 'Departments', locations: 'Locations', data: 'Data', website: 'Website',
   uploads: 'Uploads', drive: 'Google Drive', analytics: 'Analytics', surveys: 'Site Surveys',
@@ -57,7 +58,7 @@ export default function AdminPanel() {
   // Leads/Orders/Companies use it to jump straight into the right thread.
   function changeTab(next, opts) {
     setTab(next);
-    if (next === 'chat') setChatTarget(opts?.leadId ? { leadId: opts.leadId } : null);
+    if (next === 'whatsapp') setChatTarget(opts?.leadId ? { leadId: opts.leadId } : null);
     clearGlobalSearch();
     try { sessionStorage.setItem('btl_admin_tab', next); } catch {}
   }
@@ -103,9 +104,9 @@ export default function AdminPanel() {
     return lv !== undefined && lv >= level;
   }
 
-  const allowedTabs = ['dashboard', 'orders', 'payments', 'leads', 'chat', 'companies', 'accounts', 'vendors', 'team', 'departments', 'locations', 'data', 'website', 'uploads', 'drive', 'analytics', 'surveys', 'settings']
+  const allowedTabs = ['dashboard', 'orders', 'payments', 'leads', 'chat', 'whatsapp', 'companies', 'accounts', 'vendors', 'team', 'departments', 'locations', 'data', 'website', 'uploads', 'drive', 'analytics', 'surveys', 'settings']
     .filter(id => {
-      const mins = { dashboard: 0, orders: 0, leads: 1, chat: 1, companies: 1, team: 2, departments: 2, locations: 0, data: 1, website: 1, uploads: 1, drive: 1, analytics: 1, surveys: 2, settings: 3 };
+      const mins = { dashboard: 0, orders: 0, leads: 1, chat: 1, whatsapp: 1, companies: 1, team: 2, departments: 2, locations: 0, data: 1, website: 1, uploads: 1, drive: 1, analytics: 1, surveys: 2, settings: 3 };
       // Money moves here, so this is Manager and above. The `manager` role sits
       // at level 1 in the matrix, hence the explicit allowance alongside surveys.
       if (id === 'payments') return can(2) || staff?.role === 'manager';
@@ -189,7 +190,8 @@ export default function AdminPanel() {
       case 'orders':     return <OrdersTab onNavigate={changeTab} />;
       case 'payments':   return <PaymentsTab />;
       case 'leads':      return <LeadsTab onNavigate={changeTab} />;
-      case 'chat':       return <ChatTab target={chatTarget} />;
+      case 'chat':       return <TeamChatTab />;
+      case 'whatsapp':   return <ChatTab target={chatTarget} />;
       case 'companies':   return <CompaniesTab onNavigate={changeTab} />;
       case 'accounts':    return <AccountsTab onNavigate={changeTab} />;
       case 'vendors':     return <VendorsTab onNavigate={changeTab} />;

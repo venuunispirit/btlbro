@@ -40,6 +40,7 @@ const defaultData = {
   leads: [],
   companies: [],
   conversations: [],
+  team_messages: [],
   departments: [],
   users: [],
   sessions: [],
@@ -1615,6 +1616,24 @@ getUserByEmail(email) {
     Object.assign(msg, patch);
     db.write();
     return msg;
+  },
+
+  // ===== Internal team chat (socket.io) =====
+
+  getTeamMessages(room) {
+    if (!db.data.team_messages) db.data.team_messages = [];
+    return (db.data.team_messages || [])
+      .filter((m) => m.room === room)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  },
+
+  addTeamMessage(msgData) {
+    if (!db.data.team_messages) db.data.team_messages = [];
+    const id = Math.max(0, ...(db.data.team_messages || []).map((m) => m.id || 0)) + 1;
+    const record = { id, ...msgData, timestamp: msgData.timestamp || new Date().toISOString() };
+    db.data.team_messages.push(record);
+    db.write();
+    return record;
   },
 
   // ===== Website content (section-by-section managed via admin) =====

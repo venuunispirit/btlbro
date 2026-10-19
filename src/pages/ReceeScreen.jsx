@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   MapPin, Camera, Locate, Send, CheckCircle2, Lock, AlertTriangle,
   User, Phone, X, Loader, ClipboardList, ArrowLeft, Check, Ban, Clock, Navigation,
-  ChevronDown, LogOut,
+  ChevronDown, LogOut, MessageSquare,
 } from 'lucide-react';
 import { getUser, getToken, logout as apiLogout } from '../services/shopClient.js';
+import { io } from 'socket.io-client';
 
 // Recee / site-survey screen for the recee team.
 //     1. Logs in (unified login) → role 'recee' lands here automatically.
@@ -62,9 +63,85 @@ function geoVerdict(target, coords, accuracy) {
   const [capturing, setCapturing] = useState(false); // showing the capture screen (ad-hoc included)
   const [serviceState, setServiceState] = useState({}); // name → true | false
   const [menuOpen, setMenuOpen] = useState(false);
+  // Internal team chat (mobile)
+  const [showChat, setShowChat] = useState(false);
+  const [chatRooms, setChatRooms] = useState([]);
+  const [chatRoom, setChatRoom] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatConnected, setChatConnected] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatSocketRef = useRef(null);
+  const chatEndRef = useRef(null);
   const [listView, setListView] = useState(false); // showing the full recee list (vs latest-3 dashboard)
   const [captureStep, setCaptureStep] = useState(0); // wizard step within the capture screen
   const menuRef = useRef(null);
+
+  async function loadChatRooms() {
+    try {
+      const token = getToken();
+      const res = await fetch('/api/admin/internal-chat/rooms', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setChatRooms(data.rooms || []);
+        if (!chatRoom && (data.rooms || []).length) setChatRoom(data.rooms[0]);
+      }
+    } catch {}
+  }
+  async function loadChatMessages(room) {
+    if (!room) return;
+    setChatLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/admin/internal-chat/messages?room=${encodeURIComponent(room.id)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setChatMessages(data.messages || []);
+    } catch { setChatMessages([]); }
+    setChatLoading(false);
+  }
+  function connectChatSocket() {
+    const token = getToken();
+    const socket = io({ auth: { token }, transports: ['websocket', 'polling'] });
+    chatSocketRef.current = socket;
+    socket.on('connect', () => setChatConnected(true));
+    socket.on('disconnect', () => setChatConnected(false));
+    socket.on('connect_error', () => setChatConnected(false));
+    socket.on('new_message', (msg) => {
+      setChatRoom((r) => {
+        if (r && msg.room === r.id) {
+          setChatMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+        }
+        return r;
+      });
+    });
+  }
+  async function sendChatMessage() {
+    const text = chatInput.trim();
+    if (!text || !chatRoom) return;
+    setChatInput('');
+    const socket = chatSocketRef.current;
+    if (socket && socket.connected) {
+      socket.emit('send_message', { room: chatRoom.id, text }, (ack) => {
+        if (ack?.ok && ack.message) {
+          setChatMessages((prev) => (prev.some((m) => m.id === ack.message.id) ? prev : [...prev, ack.message]));
+        } else {
+          setChatInput(text);
+        }
+      });
+    } else {
+      try {
+        const token = getToken();
+        const res = await fetch('/api/admin/internal-chat/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ room: chatRoom.id, text }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.message) setChatMessages((prev) => (prev.some((m) => m.id === data.message.id) ? prev : [...prev, data.message]));
+        else setChatInput(text);
+      } catch { setChatInput(text); }
+    }
+  }
 
   const isRecee = user && user.is_team && ['recee', 'recee_manager'].includes(user.role);
   const isAdminTest = user && user.is_team && ['super_admin', 'manager'].includes(user.role);
@@ -74,6 +151,8 @@ function geoVerdict(target, coords, accuracy) {
     if (!isRecee && !isAdminTest) { onNavigate?.('/dashboard'); return; }
     captureLocation();
     loadAssignments();
+    connectChatSocket();
+    loadChatRooms();
     // Poll so an assignment made in the Data tab shows up without a reload;
     // skip while the tab is hidden to save requests.
     const poll = setInterval(() => { if (!document.hidden) loadAssignments(true); }, 25000);
@@ -82,6 +161,7 @@ function geoVerdict(target, coords, accuracy) {
     return () => { clearInterval(poll); window.removeEventListener('focus', onFocus); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
   // Close the profile menu on outside tap or Escape.
   useEffect(() => {
@@ -97,6 +177,9 @@ function geoVerdict(target, coords, accuracy) {
       document.removeEventListener('keydown', onKey);
     };
   }, [menuOpen]);
+  useEffect(() => {
+    if (chatRoom) loadChatMessages(chatRoom);
+  }, [chatRoom]);
 
   // `silent` refreshes keep the current list on screen instead of flashing the
   // loading state — used by the focus/poll updates above.
@@ -489,6 +572,59 @@ function geoVerdict(target, coords, accuracy) {
     );
   }
 
+  if (showChat) {
+    return (
+      <div style={{ ...styles.wrap, background: '#F7F5F1', display: 'flex', flexDirection: 'column', paddingBottom: 0 }}>
+        <div style={{ ...styles.header }}>
+          <div style={styles.brandRow}>
+            <span style={styles.logoMark}>B</span>
+            <span style={styles.brand}>BTL<span style={{ color: '#F2701D' }}>bro</span></span>
+          </div>
+          <button type="button" onClick={() => setShowChat(false)} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', padding: '8px 12px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            ← Back
+          </button>
+        </div>
+        <div style={{ padding: 12, display: 'flex', gap: 8, overflowX: 'auto', background: '#fff', borderBottom: '1px solid #E7E2D8' }}>
+          {chatRooms.map((r) => (
+            <button key={r.id} onClick={() => setChatRoom(r)} style={{
+              padding: '8px 12px', borderRadius: 999, border: '1px solid #E7E2D8', whiteSpace: 'nowrap',
+              background: chatRoom?.id === r.id ? '#F2701D' : '#fff', color: chatRoom?.id === r.id ? '#fff' : '#161616',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}>
+              {r.type === 'group' ? 'Team' : r.name}
+            </button>
+          ))}
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
+          {chatLoading ? <div style={{ textAlign: 'center', color: '#949494', fontSize: 13, marginTop: 40 }}>Loading…</div> : null}
+          {!chatLoading && chatMessages.length === 0 ? <div style={{ textAlign: 'center', color: '#949494', fontSize: 13, marginTop: 40 }}>No messages yet.</div> : null}
+          {chatMessages.map((m) => {
+            const isMe = Number(m.sender_id) === Number(user.id);
+            return (
+              <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                <div style={{ maxWidth: '82%', padding: '10px 14px', borderRadius: 12, background: isMe ? '#F2701D' : '#fff', color: isMe ? '#fff' : '#161616', fontSize: 14, lineHeight: 1.5, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+                  {!isMe && <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, marginBottom: 2 }}>{m.sender_name}</div>}
+                  <div>{m.text}</div>
+                  <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4, textAlign: 'right' }}>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={chatEndRef} />
+        </div>
+        <div style={{ padding: 12, background: '#fff', borderTop: '1px solid #E7E2D8', display: 'flex', gap: 8 }}>
+          <input value={chatInput} onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), sendChatMessage())}
+            placeholder={chatConnected ? 'Type a message…' : 'Connecting…'}
+            style={{ flex: 1, padding: '12px 14px', borderRadius: 10, fontSize: 15, border: '1.5px solid #E7E2D8', outline: 'none' }} />
+          <button onClick={sendChatMessage} disabled={!chatInput.trim()} style={{ padding: '12px 16px', borderRadius: 10, border: 'none', background: chatInput.trim() ? '#F2701D' : '#E7E2D8', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+            Send
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.wrap}>
 <style>{`
@@ -546,6 +682,15 @@ function geoVerdict(target, coords, accuracy) {
                   onClick={() => { setMenuOpen(false); stopRequest(); setListView(true); }}
                 >
                   <ClipboardList size={15} /> Recee list
+                </button>
+                <button
+                  type="button"
+                  className="recee-menuItem"
+                  style={styles.menuItem}
+                  role="menuitem"
+                  onClick={() => { setMenuOpen(false); setShowChat(true); setListView(false); }}
+                >
+                  <MessageSquare size={15} /> Team chat
                 </button>
                 <button
                   type="button"

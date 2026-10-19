@@ -1,4 +1,6 @@
 import express from 'express';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -22,6 +24,7 @@ import paymentsRoutes from './routes/payments.js';
 import upiPaymentsRoutes, { callbackRouter as upiCallbackRoutes } from './routes/upiPayments.js';
 import checkoutRoutes from './routes/checkout.js';
 import chatRoutes from './routes/chat.js';
+import internalChatRoutes from './routes/internalChat.js';
 import companiesRoutes from './routes/companies.js';
 import telephonyRoutes from './routes/telephony.js';
 import departmentsRoutes from './routes/departments.js';
@@ -30,6 +33,7 @@ import { startScheduler } from './services/scheduler.js';
 import { install as installNotifier } from './services/notify.js';
 import { adminAuth } from './middleware/adminAuth.js';
 import { ensureSuperAdmin, migrateCustomerRoles } from './bootstrap.js';
+import { initTeamChat } from './services/teamChat.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,6 +42,11 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 8081;
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: { origin: ['http://localhost:5174','http://localhost:3000','http://127.0.0.1:5174'], credentials: true },
+});
+app.set('io', io);
 
 // ========== MIDDLEWARE ==========
 app.use(cors({
@@ -112,6 +121,9 @@ app.use('/api/places', placesRoutes);
 // WhatsApp chat (admin)
 app.use('/api/admin/chat', chatRoutes);
 
+// Internal team chat (socket.io backed)
+app.use('/api/admin/internal-chat', internalChatRoutes);
+
 // Customer accounts / companies (the CRM spine — leads, chat, payments rollup)
 app.use('/api/admin/companies', companiesRoutes);
 
@@ -141,7 +153,9 @@ app.use((err, req, res, next) => {
 // still records events, nothing is ever sent.
 installNotifier();
 
-app.listen(PORT, () => {
+initTeamChat(io);
+
+server.listen(PORT, () => {
   console.log(`\n🚀 BTL Bro API Server running on http://localhost:${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌐 Public content: http://localhost:${PORT}/api/content`);

@@ -351,7 +351,7 @@ export default function CompaniesTab({ onNavigate }) {
                       {c.customer_phone} · {(c.messages || []).length} messages · {fmtDT(c.last_msg_at)}
                     </div>
                   </div>
-                  <button style={s.btnGhost} onClick={() => onNavigate?.('chat')}>Open chat</button>
+                  <button style={s.btnGhost} onClick={() => onNavigate?.('whatsapp')}>Open chat</button>
                 </div>
               ))
             )}

@@ -9,13 +9,13 @@
     "is_connected": true,
     "auto_sync_enabled": true,
     "sync_frequency": "5",
-    "last_sync_at": "2026-10-19T11:05:02.876Z",
+    "last_sync_at": "2026-10-19T11:32:02.682Z",
     "last_sync_status": "success",
     "last_sync_message": "Sync: +0 added, 0 updated, 0 deactivated, 887 unchanged",
     "files_found": 1,
     "records_imported": 887,
     "created_at": "2026-09-05T06:29:06.552Z",
-    "updated_at": "2026-10-19T11:05:02.876Z"
+    "updated_at": "2026-10-19T11:32:02.682Z"
   },
   "files": [
     {
@@ -38,14 +38,14 @@
       "file_name": "Google Sheet (887 records)",
       "file_type": "Google Sheet",
       "mime_type": "text/csv",
-      "file_size": 286239,
+      "file_size": 285856,
       "drive_url": "https://docs.google.com/spreadsheets/d/1mHhMELNIRgoCVIoKACrlqJAQSoFFDEGb/edit?usp=sharing&ouid=104258460797430319682&rtpof=true&sd=true",
-      "last_modified": "2026-10-19T11:05:02.851Z",
+      "last_modified": "2026-10-19T11:32:02.664Z",
       "records_count": 887,
       "status": "synced",
-      "sync_batch_id": 2391,
+      "sync_batch_id": 2395,
       "created_at": "2026-09-07T05:30:01.999Z",
-      "updated_at": "2026-10-19T11:05:02.851Z"
+      "updated_at": "2026-10-19T11:32:02.664Z"
     }
   ],
   "records": [
@@ -86995,6 +86995,66 @@
       "deactivated": 0,
       "error_message": "1 warning(s)",
       "completed_at": "2026-10-19T11:05:02.888Z"
+    },
+    {
+      "status": "success",
+      "trigger_type": "scheduled",
+      "id": 2392,
+      "started_at": "2026-10-19T11:11:00.291Z",
+      "admin": "Admin",
+      "files_found": 1,
+      "records_imported": 887,
+      "added": 0,
+      "updated": 0,
+      "unchanged": 887,
+      "deactivated": 0,
+      "error_message": "1 warning(s)",
+      "completed_at": "2026-10-19T11:11:03.449Z"
+    },
+    {
+      "status": "success",
+      "trigger_type": "scheduled",
+      "id": 2393,
+      "started_at": "2026-10-19T11:17:00.063Z",
+      "admin": "Admin",
+      "files_found": 1,
+      "records_imported": 887,
+      "added": 0,
+      "updated": 0,
+      "unchanged": 887,
+      "deactivated": 0,
+      "error_message": "1 warning(s)",
+      "completed_at": "2026-10-19T11:17:02.516Z"
+    },
+    {
+      "status": "success",
+      "trigger_type": "scheduled",
+      "id": 2394,
+      "started_at": "2026-10-19T11:23:00.190Z",
+      "admin": "Admin",
+      "files_found": 1,
+      "records_imported": 887,
+      "added": 0,
+      "updated": 0,
+      "unchanged": 887,
+      "deactivated": 0,
+      "error_message": "1 warning(s)",
+      "completed_at": "2026-10-19T11:23:02.628Z"
+    },
+    {
+      "status": "success",
+      "trigger_type": "scheduled",
+      "id": 2395,
+      "started_at": "2026-10-19T11:32:00.627Z",
+      "admin": "Admin",
+      "files_found": 1,
+      "records_imported": 887,
+      "added": 0,
+      "updated": 0,
+      "unchanged": 887,
+      "deactivated": 0,
+      "error_message": "1 warning(s)",
+      "completed_at": "2026-10-19T11:32:02.693Z"
     }
   ],
   "sync_errors": [],
@@ -101779,10 +101839,10 @@
       "id": 14,
       "name": "Muzammil",
       "email": "muzamuzammil43@gmail.com",
-      "password_salt": "386202d749684dfd64b3ce146d0644db",
-      "password_hash": "95ee1a173c96f0649662414c4e838d1495d60b55d923a25144a7993c4e33159771c6eec3470c42a5fb690f5c59391b9a2fba0813ce7b7a4e5f8ccc107232eaae",
+      "password_salt": "645b64fcf2a705c9e96d1aac140938e5",
+      "password_hash": "a6221d855eab99f416e973f1d29503aad5c206c5e961d64c42c2a36e7c2dbc622fc81a7126fd155c15fccf6a0c7fc5d9c38d2bce06f198de8c40da6ac906d28c",
       "password_enc": "v1.cLq2HF/nEzQqKFuH.pvou4C32UAZZulzqJRcxVg==.SnQw6CgPfQ==",
-      "phone": "",
+      "phone": "1234567890",
       "designation": "",
       "role": "recee",
       "is_team": true,
@@ -101790,7 +101850,8 @@
       "department_id": 1,
       "locations": "",
       "is_active": true,
-      "created_at": "2026-10-15T05:51:04.229Z"
+      "created_at": "2026-10-15T05:51:04.229Z",
+      "updated_at": "2026-10-19T11:31:52.146Z"
     },
     {
       "id": 15,
@@ -101982,9 +102043,49 @@
       "expires_at": "2026-11-18T10:54:01.970Z"
     },
     {
-      "token": "9f7995caf8d04537c94f91b60b606e157d8743d1132224c895d315085b62bfcf",
+      "token": "8233a8a9f05842577bb47a756df49f3d2e64c70dae133f5eac0e9b0a5c8dada7",
       "user_id": 7,
-      "expires_at": "2026-11-18T10:58:27.175Z"
+      "expires_at": "2026-11-18T11:22:40.959Z"
+    },
+    {
+      "token": "6064b04d6994bbc79ec772db888bcc483dc174ae198f9962bd534fa34de6d512",
+      "user_id": 7,
+      "expires_at": "2026-11-18T11:22:42.875Z"
+    },
+    {
+      "token": "53dad0af82950e2dc28748329b4f00d4d74579dce477d964f53710535a6d759c",
+      "user_id": 7,
+      "expires_at": "2026-11-18T11:22:45.398Z"
+    },
+    {
+      "token": "4fc7f46ccbd05a1180f3cad2a067487093da1ad60034100bb4497c5db00f7368",
+      "user_id": 7,
+      "expires_at": "2026-11-18T11:22:49.107Z"
+    },
+    {
+      "token": "bdaf52411c30352fc59f3891acdd38b8bf841ab2bb86e786aeb7ddfe79f22c68",
+      "user_id": 14,
+      "expires_at": "2026-11-18T11:31:59.797Z"
+    },
+    {
+      "token": "54e7a347248e1f291044f2fbbe8a49e184520f6f8308eea9af6a4634bb23cfee",
+      "user_id": 14,
+      "expires_at": "2026-11-18T11:34:28.498Z"
+    },
+    {
+      "token": "50f753b1c83a88e67ad59319314888b96033470ea62bdc5db301eef6246b6cc1",
+      "user_id": 7,
+      "expires_at": "2026-11-18T11:34:37.081Z"
+    },
+    {
+      "token": "399863442ff7201581ebd8b140d11c3dea7e493309fdcd8a280444cb21a16d0f",
+      "user_id": 14,
+      "expires_at": "2026-11-18T11:34:37.146Z"
+    },
+    {
+      "token": "3134c84bae5e2dcf1ff195ba8efb8b83951b74e2869788359bce003a448c3bf9",
+      "user_id": 7,
+      "expires_at": "2026-11-18T11:36:02.331Z"
     }
   ],
   "carts": [
@@ -106989,5 +107090,15 @@
       "reference": "btl_in_261019_nlx9c9"
     }
   ],
-  "purchase_orders": []
+  "purchase_orders": [],
+  "team_messages": [
+    {
+      "id": 3,
+      "room": "dm:7:14",
+      "sender_id": 7,
+      "sender_name": "Admin",
+      "text": "hi",
+      "timestamp": "2026-10-19T11:22:56.123Z"
+    }
+  ]
 }

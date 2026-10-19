@@ -362,7 +362,7 @@ export default function LeadsTab({ onNavigate }) {
                             <Phone size={14} />
                           </button>
                           {l.phone && onNavigate && (
-                            <button onClick={() => onNavigate('chat', { leadId: l.id })} title="Message on WhatsApp"
+                            <button onClick={() => onNavigate('whatsapp', { leadId: l.id })} title="Message on WhatsApp"
                               style={{ padding: 4, borderRadius: 4, border: 'none', background: 'none', color: '#059669', cursor: 'pointer', display: 'inline-flex' }}>
                               <MessageSquare size={14} />
                             </button>
@@ -448,7 +448,7 @@ export default function LeadsTab({ onNavigate }) {
                     would bounce the user out of the CRM into WhatsApp, which
                     breaks the flow this panel exists for. */}
                 {detailLead.phone && onNavigate && (
-                  <button onClick={() => onNavigate('chat', { leadId: detailLead.id })}
+                  <button onClick={() => onNavigate('whatsapp', { leadId: detailLead.id })}
                     style={{
                       marginTop: 14, width: '100%', padding: '9px 12px', borderRadius: 8, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,

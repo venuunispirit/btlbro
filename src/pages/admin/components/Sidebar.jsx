@@ -2,7 +2,7 @@ import React from 'react';
 import {
   LayoutDashboard, CreditCard, MapPin, Upload, FileSpreadsheet,
   BarChart3, Settings as SettingsIcon, Users, Palette, Table2, LogOut,
-  Shield, Globe, Target, MessageSquare, Layers, Camera, Wallet,
+  Shield, Globe, Target, MessageSquare, MessageCircle, Layers, Camera, Wallet,
   PanelLeftClose, PanelLeftOpen, Building2, Truck, X,
 } from 'lucide-react';
 
@@ -36,7 +36,7 @@ export default function Sidebar({ staff, activeTabId, onNavigate, onLogout, coll
     { id: 'leads', label: 'Leads', icon: Target, min: 1 },
     { id: 'orders', label: 'Orders', icon: CreditCard, min: 0 },
     { id: 'payments', label: 'Payments', icon: Wallet, min: 2, also: ['manager'] },
-    { id: 'chat', label: 'Chat', icon: MessageSquare, min: 1 },
+    { id: 'chat', label: 'Team Chat', icon: MessageSquare, min: 1 },
     { id: 'companies', label: 'Companies', icon: Building2, also: ['bd_executive', 'manager', 'bdm', 'ops_manager', 'super_admin'] },
     { id: 'accounts', label: 'Accounts', icon: Wallet, min: 2, also: ['manager'] },
     { id: 'vendors', label: 'Vendors', icon: Truck, also: ['manager', 'bdm', 'ops_manager', 'super_admin'] },
